@@ -1,0 +1,10 @@
+requests
+pandas
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pyyaml
+matplotlib
+tabulate
+faker==40.63.0
+pytest
