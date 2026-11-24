@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rushmore
+    ports:
+      - "5434:5432"
+    volumes:
+      # Files here run in name order the first time the container starts:
+      # 01 schema -> 02 data -> 03 read-only user
+      - ./db/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./db/02_data.sql:/docker-entrypoint-initdb.d/02_data.sql
+      - ./db/03_readonly_role.sql:/docker-entrypoint-initdb.d/03_readonly_role.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rushmore"]
+      interval: 5s
+      retries: 10

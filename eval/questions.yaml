@@ -1,0 +1,292 @@
+# Benchmark: 40 plain-English questions about the RushMore database.
+# Each question has a hand-written "gold" SQL query whose result is the correct answer.
+#   difficulty    : easy (one table) | medium (joins / grouping) | hard (windows, subqueries, multi-step)
+#                   | unanswerable (the data needed does not exist; the right answer is CANNOT_ANSWER)
+#   order_matters : true when the question asks for a specific order, so row order is checked too.
+
+- id: E01
+  difficulty: easy
+  question: How many customers are there?
+  gold_sql: SELECT COUNT(*) FROM customers;
+
+- id: E02
+  difficulty: easy
+  question: How many orders have been placed in total?
+  gold_sql: SELECT COUNT(*) FROM orders;
+
+- id: E03
+  difficulty: easy
+  question: List the city and address of every store.
+  gold_sql: SELECT city, address FROM stores;
+
+- id: E04
+  difficulty: easy
+  question: What is the price of the Large Pepperoni Pizza?
+  gold_sql: SELECT price FROM menu_items WHERE name = 'Large Pepperoni Pizza';
+
+- id: E05
+  difficulty: easy
+  question: How many menu items are there in each category?
+  gold_sql: SELECT category, COUNT(*) FROM menu_items GROUP BY category;
+
+- id: E06
+  difficulty: easy
+  question: What is the average order total, rounded to 2 decimal places?
+  gold_sql: SELECT ROUND(AVG(total_amount), 2) FROM orders;
+
+- id: E07
+  difficulty: easy
+  question: Which menu items cost more than 7000? Show the name and price.
+  gold_sql: SELECT name, price FROM menu_items WHERE price > 7000;
+
+- id: E08
+  difficulty: easy
+  question: What is the largest single order total?
+  gold_sql: SELECT MAX(total_amount) FROM orders;
+
+- id: E09
+  difficulty: easy
+  question: How many ingredients have their stock measured in kg?
+  gold_sql: SELECT COUNT(*) FROM ingredients WHERE unit = 'kg';
+
+- id: E10
+  difficulty: easy
+  question: List the 5 ingredients with the lowest stock quantity, lowest first.
+  gold_sql: SELECT name, stock_quantity FROM ingredients ORDER BY stock_quantity ASC LIMIT 5;
+  order_matters: true
+
+- id: E11
+  difficulty: easy
+  question: How many customers created their account in 2026?
+  gold_sql: >
+    SELECT COUNT(*) FROM customers
+    WHERE created_at >= '2026-01-01' AND created_at < '2027-01-01';
+
+- id: E12
+  difficulty: easy
+  question: How many orders were placed in March 2026?
+  gold_sql: >
+    SELECT COUNT(*) FROM orders
+    WHERE order_timestamp >= '2026-03-01' AND order_timestamp < '2026-04-01';
+
+- id: M01
+  difficulty: medium
+  question: How many orders did each city receive?
+  gold_sql: >
+    SELECT s.city, COUNT(*) FROM orders o JOIN stores s ON s.store_id = o.store_id
+    GROUP BY s.city;
+
+- id: M02
+  difficulty: medium
+  question: Show the total revenue for each store, from highest to lowest.
+  gold_sql: >
+    SELECT s.store_id, SUM(o.total_amount) AS revenue
+    FROM stores s JOIN orders o ON o.store_id = s.store_id
+    GROUP BY s.store_id ORDER BY revenue DESC;
+  order_matters: true
+
+- id: M03
+  difficulty: medium
+  question: What is the address of the store with the highest total revenue?
+  gold_sql: >
+    SELECT s.address FROM stores s JOIN orders o ON o.store_id = s.store_id
+    GROUP BY s.store_id, s.address ORDER BY SUM(o.total_amount) DESC LIMIT 1;
+
+- id: M04
+  difficulty: medium
+  question: How many units have been sold in each menu category?
+  gold_sql: >
+    SELECT m.category, SUM(oi.quantity) FROM order_items oi
+    JOIN menu_items m ON m.item_id = oi.item_id GROUP BY m.category;
+
+- id: M05
+  difficulty: medium
+  question: Which menu item has sold the most units?
+  gold_sql: >
+    SELECT m.name FROM order_items oi JOIN menu_items m ON m.item_id = oi.item_id
+    GROUP BY m.item_id, m.name ORDER BY SUM(oi.quantity) DESC LIMIT 1;
+
+- id: M06
+  difficulty: medium
+  question: Who are the top 5 customers by total amount spent? Show first name, last name and total spent, highest first.
+  gold_sql: >
+    SELECT c.first_name, c.last_name, SUM(o.total_amount) AS total_spent
+    FROM customers c JOIN orders o ON o.customer_id = c.customer_id
+    GROUP BY c.customer_id, c.first_name, c.last_name
+    ORDER BY total_spent DESC LIMIT 5;
+  order_matters: true
+
+- id: M07
+  difficulty: medium
+  question: Show total revenue for each month of 2026, in month order.
+  gold_sql: >
+    SELECT EXTRACT(MONTH FROM order_timestamp) AS month, SUM(total_amount)
+    FROM orders WHERE order_timestamp >= '2026-01-01' AND order_timestamp < '2027-01-01'
+    GROUP BY month ORDER BY month;
+  order_matters: true
+
+- id: M08
+  difficulty: medium
+  question: How many different customers have placed at least one order?
+  gold_sql: SELECT COUNT(DISTINCT customer_id) FROM orders;
+
+- id: M09
+  difficulty: medium
+  question: How many customers have never placed an order?
+  gold_sql: >
+    SELECT COUNT(*) FROM customers c
+    WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id);
+
+- id: M10
+  difficulty: medium
+  question: On average, how many line items does an order contain? Round to 2 decimal places.
+  gold_sql: >
+    SELECT ROUND(AVG(n), 2) FROM (SELECT COUNT(*) AS n FROM order_items GROUP BY order_id) t;
+
+- id: M11
+  difficulty: medium
+  question: What is the total revenue from items in the Drink category?
+  gold_sql: >
+    SELECT SUM(oi.quantity * oi.unit_price) FROM order_items oi
+    JOIN menu_items m ON m.item_id = oi.item_id WHERE m.category = 'Drink';
+
+- id: M12
+  difficulty: medium
+  question: Which day of the week has the most orders?
+  gold_sql: >
+    SELECT TRIM(TO_CHAR(order_timestamp, 'Day')) AS day FROM orders
+    GROUP BY day ORDER BY COUNT(*) DESC LIMIT 1;
+
+- id: M13
+  difficulty: medium
+  question: For the Abuja store, how many orders were placed and what was the total revenue?
+  gold_sql: >
+    SELECT COUNT(*), SUM(o.total_amount) FROM orders o
+    JOIN stores s ON s.store_id = o.store_id WHERE s.city = 'Abuja';
+
+- id: M14
+  difficulty: medium
+  question: What is the average order total in each city, rounded to 2 decimal places?
+  gold_sql: >
+    SELECT s.city, ROUND(AVG(o.total_amount), 2) FROM orders o
+    JOIN stores s ON s.store_id = o.store_id GROUP BY s.city;
+
+- id: M15
+  difficulty: medium
+  question: How many pizzas of each size (Small, Medium, Large) have been sold?
+  gold_sql: >
+    SELECT m.size, SUM(oi.quantity) FROM order_items oi
+    JOIN menu_items m ON m.item_id = oi.item_id
+    WHERE m.category = 'Pizza' GROUP BY m.size;
+
+- id: M16
+  difficulty: medium
+  question: Which customers have placed more than 10 orders? Show the customer ID and number of orders.
+  gold_sql: >
+    SELECT customer_id, COUNT(*) FROM orders
+    GROUP BY customer_id HAVING COUNT(*) > 10;
+
+- id: H01
+  difficulty: hard
+  question: For each store, which menu item has sold the most units? Show the store ID and item name.
+  gold_sql: >
+    SELECT store_id, name FROM (
+      SELECT o.store_id, m.name,
+             RANK() OVER (PARTITION BY o.store_id ORDER BY SUM(oi.quantity) DESC) AS rnk
+      FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN menu_items m ON m.item_id = oi.item_id
+      GROUP BY o.store_id, m.item_id, m.name) t
+    WHERE rnk = 1;
+
+- id: H02
+  difficulty: hard
+  question: For each month of 2026, show the revenue and the change in revenue from the previous month, in month order.
+  gold_sql: >
+    SELECT month, revenue, revenue - LAG(revenue) OVER (ORDER BY month) AS change FROM (
+      SELECT EXTRACT(MONTH FROM order_timestamp) AS month, SUM(total_amount) AS revenue
+      FROM orders WHERE order_timestamp >= '2026-01-01' AND order_timestamp < '2027-01-01'
+      GROUP BY month) t
+    ORDER BY month;
+  order_matters: true
+
+- id: H03
+  difficulty: hard
+  question: What percentage of total item revenue comes from each menu category? Round to 2 decimal places.
+  gold_sql: >
+    SELECT m.category,
+           ROUND(100.0 * SUM(oi.quantity * oi.unit_price)
+                 / SUM(SUM(oi.quantity * oi.unit_price)) OVER (), 2)
+    FROM order_items oi JOIN menu_items m ON m.item_id = oi.item_id
+    GROUP BY m.category;
+
+- id: H04
+  difficulty: hard
+  question: How many customers placed their very first order in January 2026?
+  gold_sql: >
+    SELECT COUNT(*) FROM (
+      SELECT customer_id, MIN(order_timestamp) AS first_order FROM orders GROUP BY customer_id) t
+    WHERE first_order >= '2026-01-01' AND first_order < '2026-02-01';
+
+- id: H05
+  difficulty: hard
+  question: Show the running total of revenue by month for 2026, in month order.
+  gold_sql: >
+    SELECT month, SUM(revenue) OVER (ORDER BY month) AS running_total FROM (
+      SELECT EXTRACT(MONTH FROM order_timestamp) AS month, SUM(total_amount) AS revenue
+      FROM orders WHERE order_timestamp >= '2026-01-01' AND order_timestamp < '2027-01-01'
+      GROUP BY month) t
+    ORDER BY month;
+  order_matters: true
+
+- id: H06
+  difficulty: hard
+  question: How many orders have a total amount that does not equal the sum of quantity times unit price of their items?
+  gold_sql: >
+    SELECT COUNT(*) FROM orders o
+    JOIN (SELECT order_id, SUM(quantity * unit_price) AS item_total
+          FROM order_items GROUP BY order_id) t ON t.order_id = o.order_id
+    WHERE o.total_amount <> t.item_total;
+
+- id: H07
+  difficulty: hard
+  question: Which customers placed 7 or more orders at Lagos stores? Show customer ID and order count.
+  gold_sql: >
+    SELECT o.customer_id, COUNT(*) AS n FROM orders o
+    JOIN stores s ON s.store_id = o.store_id WHERE s.city = 'Lagos'
+    GROUP BY o.customer_id HAVING COUNT(*) >= 7;
+
+- id: H08
+  difficulty: hard
+  question: For each menu category, which item has brought in the most revenue? Show category, item name and revenue.
+  gold_sql: >
+    SELECT category, name, revenue FROM (
+      SELECT m.category, m.name, SUM(oi.quantity * oi.unit_price) AS revenue,
+             RANK() OVER (PARTITION BY m.category ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS rnk
+      FROM order_items oi JOIN menu_items m ON m.item_id = oi.item_id
+      GROUP BY m.category, m.item_id, m.name) t
+    WHERE rnk = 1;
+
+- id: H09
+  difficulty: hard
+  question: What percentage of orders include at least one drink? Round to 2 decimal places.
+  gold_sql: >
+    SELECT ROUND(100.0 * COUNT(DISTINCT oi.order_id) / (SELECT COUNT(*) FROM orders), 2)
+    FROM order_items oi JOIN menu_items m ON m.item_id = oi.item_id
+    WHERE m.category = 'Drink';
+
+- id: H10
+  difficulty: hard
+  question: Which hour of the day has the highest average order total?
+  gold_sql: >
+    SELECT EXTRACT(HOUR FROM order_timestamp) AS hour FROM orders
+    GROUP BY hour ORDER BY AVG(total_amount) DESC LIMIT 1;
+
+- id: U01
+  difficulty: unanswerable
+  question: Which ingredient is used in the most pizzas?
+  gold_sql: null
+
+- id: U02
+  difficulty: unanswerable
+  question: What is the average delivery time for each store?
+  gold_sql: null
