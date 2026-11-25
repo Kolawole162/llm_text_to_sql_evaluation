@@ -1,0 +1,862 @@
+run,id,difficulty,question,error_type,error_message,sql,root_cause,notes
+openai/gpt-oss-120b / v1,E04,easy,What is the price of the Large Pepperoni Pizza?,unknown_column,column mi.item_name does not exist,"SELECT
+    mi.price
+FROM
+    menu_items AS mi
+WHERE
+    mi.item_name = 'Large Pepperoni Pizza'",,
+openai/gpt-oss-120b / v1,E06,easy,"What is the average order total, rounded to 2 decimal places?",unknown_column,column mi.id does not exist,"SELECT ROUND(AVG(order_total), 2) AS avg_order_total
+FROM (
+         
+        SELECT  oi.order_id,
+                SUM(oi.quantity * mi.price) AS order_total
+        FROM    order_items   AS oi
+        JOIN    menu_items    AS mi
+               ON mi.id = oi.menu_item_id
+         
+        GROUP BY oi.order_id
+     ) AS per_order",,
+openai/gpt-oss-120b / v1,E08,easy,What is the largest single order total?,unknown_column,column o.id does not exist,"WITH order_totals AS (
+    SELECT
+        o.id                     AS order_id,
+        SUM(oi.quantity * mi.price) AS total_amount
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id   = o.id
+    JOIN menu_items    AS mi ON mi.id         = oi.menu_item_id
+    GROUP BY o.id
+)
+
+ 
+SELECT
+    MAX(total_amount) AS largest_order_total
+FROM order_totals",,
+openai/gpt-oss-120b / v1,E09,easy,How many ingredients have their stock measured in kg?,unknown_column,"column ""stock_unit"" does not exist","SELECT COUNT(*) AS ingredients_measured_in_kg
+FROM   ingredients
+WHERE  LOWER(stock_unit) = 'kg'",,
+openai/gpt-oss-120b / v1,E12,easy,How many orders were placed in March 2026?,unknown_column,"column ""order_date"" does not exist","SELECT COUNT(*) AS orders_in_march_2026
+FROM   orders
+WHERE  order_date >= DATE '2026-03-01'      
+  AND  order_date <  DATE '2026-04-01'",,
+openai/gpt-oss-120b / v1,M02,medium,"Show the total revenue for each store, from highest to lowest.",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    s.store_id,
+    s.store_name,
+    SUM(oi.quantity * mi.price) AS total_revenue
+FROM   stores      AS s
+JOIN   orders      AS o  ON o.store_id   = s.store_id
+JOIN   order_items AS oi ON oi.order_id  = o.order_id
+JOIN   menu_items  AS mi ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    s.store_id,
+    s.store_name
+ORDER BY
+    total_revenue DESC",,
+openai/gpt-oss-120b / v1,M03,medium,What is the address of the store with the highest total revenue?,unknown_column,column o.id does not exist,"WITH store_revenue AS (
+    SELECT
+        o.store_id,
+        SUM(oi.quantity * mi.price) AS total_revenue
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.id
+    JOIN menu_items    AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.store_id
+)
+
+ 
+SELECT s.address
+FROM   stores          AS s
+JOIN   store_revenue   AS r ON r.store_id = s.id
+ORDER BY r.total_revenue DESC
+LIMIT 1",,
+openai/gpt-oss-120b / v1,M04,medium,How many units have been sold in each menu category?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.category,
+    SUM(oi.quantity) AS units_sold
+FROM
+    order_items AS oi
+JOIN
+    menu_items AS mi
+      ON oi.menu_item_id = mi.id
+GROUP BY
+    mi.category
+ORDER BY
+    units_sold DESC",,
+openai/gpt-oss-120b / v1,M05,medium,Which menu item has sold the most units?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.menu_item_id,          
+    mi.name,                  
+    SUM(oi.quantity) AS units_sold
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.menu_item_id          
+GROUP BY
+    mi.menu_item_id,
+    mi.name
+ORDER BY
+    units_sold DESC               
+LIMIT 1",,
+openai/gpt-oss-120b / v1,M06,medium,"Who are the top 5 customers by total amount spent? Show first name, last name and total spent, highest first.",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    c.first_name,
+    c.last_name,
+    SUM(oi.quantity * mi.price) AS total_spent
+FROM customers      AS c
+JOIN orders         AS o  ON o.customer_id = c.customer_id
+JOIN order_items    AS oi ON oi.order_id    = o.order_id
+JOIN menu_items     AS mi ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    c.customer_id,          
+    c.first_name,
+    c.last_name
+ORDER BY
+    total_spent DESC
+LIMIT 5",,
+openai/gpt-oss-120b / v1,M07,medium,"Show total revenue for each month of 2026, in month order.",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    TO_CHAR(month_start, 'YYYY-MM')      AS month,          
+    SUM(oi.quantity * mi.price)          AS revenue
+FROM
+    orders          AS o
+    JOIN order_items AS oi ON oi.order_id = o.order_id
+    JOIN menu_items   AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE
+    o.order_date >= DATE '2026-01-01'          
+    AND o.order_date <  DATE '2027-01-01'      
+GROUP BY
+    month_start
+ORDER BY
+    month_start",,
+openai/gpt-oss-120b / v1,M10,medium,"On average, how many line items does an order contain? Round to 2 decimal places.",unknown_column,column o.id does not exist,"SELECT ROUND(AVG(item_cnt)::numeric, 2) AS avg_line_items_per_order
+FROM (
+        SELECT o.id,
+               COUNT(oi.id) AS item_cnt                
+        FROM   orders AS o
+        LEFT JOIN order_items AS oi
+               ON oi.order_id = o.id
+        GROUP BY o.id
+     ) AS per_order",,
+openai/gpt-oss-120b / v1,M11,medium,What is the total revenue from items in the Drink category?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS total_drink_revenue
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.id
+WHERE  mi.category = 'Drink'",,
+openai/gpt-oss-120b / v1,M12,medium,Which day of the week has the most orders?,unknown_column,column o.order_date does not exist,"SELECT
+    TO_CHAR(o.order_date, 'Day')          AS weekday_name,   
+    EXTRACT(DOW FROM o.order_date)::int AS weekday_num,    
+    COUNT(*)                              AS total_orders
+FROM orders AS o
+GROUP BY weekday_name, weekday_num
+ORDER BY total_orders DESC
+LIMIT 1",,
+openai/gpt-oss-120b / v1,M13,medium,"For the Abuja store, how many orders were placed and what was the total revenue?",unknown_column,column s.id does not exist,"SELECT
+    s.name                                   AS store_name,
+    COUNT(DISTINCT o.id)                     AS orders_placed,
+    COALESCE(SUM(mi.price * oi.quantity),0)  AS total_revenue
+FROM stores      AS s
+JOIN orders      AS o  ON o.store_id = s.id
+JOIN order_items AS oi ON oi.order_id = o.id
+JOIN menu_items  AS mi ON mi.id = oi.menu_item_id
+WHERE s.name = 'Abuja'                
+GROUP BY s.name",,
+openai/gpt-oss-120b / v1,M14,medium,"What is the average order total in each city, rounded to 2 decimal places?",unknown_column,column s.id does not exist,"SELECT
+    s.city,
+    ROUND(AVG(o.total)::numeric, 2) AS avg_order_total
+FROM orders AS o
+JOIN stores AS s
+      ON o.store_id = s.id
+GROUP BY s.city
+ORDER BY s.city",,
+openai/gpt-oss-120b / v1,M15,medium,"How many pizzas of each size (Small, Medium, Large) have been sold?",unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.size AS pizza_size,                
+    SUM(oi.quantity) AS pizzas_sold
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.id
+WHERE  mi.category = 'Pizza'               
+  AND  mi.size IN ('Small','Medium','Large')
+GROUP  BY mi.size
+ORDER  BY
+    CASE mi.size
+        WHEN 'Small'  THEN 1
+        WHEN 'Medium' THEN 2
+        WHEN 'Large'  THEN 3
+    END",,
+openai/gpt-oss-120b / v1,H01,hard,"For each store, which menu item has sold the most units? Show the store ID and item name.",unknown_column,column o.id does not exist,"WITH sales_per_item AS (
+    SELECT
+        o.store_id,                     
+        oi.menu_item_id,                
+        SUM(oi.quantity) AS units_sold  
+    FROM orders      AS o
+    JOIN order_items AS oi
+          ON oi.order_id = o.id
+    GROUP BY o.store_id, oi.menu_item_id
+),
+
+ 
+ranked_items AS (
+    SELECT
+        s.store_id,
+        s.menu_item_id,
+        s.units_sold,
+        ROW_NUMBER() OVER (PARTITION BY s.store_id
+                           ORDER BY s.units_sold DESC) AS rn   
+    FROM sales_per_item AS s
+)
+
+ 
+SELECT
+    r.store_id,
+    mi.name      AS item_name,
+    r.units_sold AS units_sold          
+FROM ranked_items AS r
+JOIN menu_items AS mi
+      ON mi.id = r.menu_item_id
+WHERE r.rn = 1                
+ORDER BY r.store_id",,
+openai/gpt-oss-120b / v1,H02,hard,"For each month of 2026, show the revenue and the change in revenue from the previous month, in month order.",unknown_column,column o.id does not exist,"WITH monthly_rev AS (
+    SELECT
+        date_trunc('month', o.order_date)               AS month_start,   
+        SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS revenue
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.id
+     
+    LEFT JOIN menu_items AS mi ON mi.id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'               
+    GROUP BY 1
+)
+
+SELECT
+    to_char(month_start, 'YYYY-MM')                     AS month,
+    revenue,
+    revenue -
+        LAG(revenue) OVER (ORDER BY month_start)        AS revenue_change
+FROM monthly_rev
+ORDER BY month_start",,
+openai/gpt-oss-120b / v1,H03,hard,What percentage of total item revenue comes from each menu category? Round to 2 decimal places.,unknown_column,column mi.id does not exist,"SELECT
+    mi.category,
+    ROUND(100.0 * SUM(oi.quantity * mi.price) 
+               / SUM(SUM(oi.quantity * mi.price)) OVER (), 2) AS revenue_pct
+FROM   order_items  oi
+JOIN   menu_items   mi ON mi.id = oi.menu_item_id
+GROUP  BY mi.category
+ORDER  BY revenue_pct DESC",,
+openai/gpt-oss-120b / v1,H04,hard,How many customers placed their very first order in January 2026?,unknown_column,column o.order_date does not exist,"SELECT COUNT(*) AS customers_first_order_jan_2026
+FROM (
+         
+        SELECT  o.customer_id,
+                MIN(o.order_date) AS first_order_date
+        FROM    orders AS o
+        GROUP BY o.customer_id
+     ) AS first_orders
+WHERE first_orders.first_order_date >= DATE '2026-01-01'
+  AND first_orders.first_order_date <  DATE '2026-02-01'",,
+openai/gpt-oss-120b / v1,H05,hard,"Show the running total of revenue by month for 2026, in month order.",unknown_column,column mi.menu_item_id does not exist,"WITH monthly_rev AS (
+     
+    SELECT
+        date_trunc('month', o.order_date)::date   AS month_start,   
+        SUM(oi.quantity * mi.price)               AS month_rev      
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.order_id
+    JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'          
+    GROUP BY 1
+),
+
+ 
+all_months AS (
+    SELECT generate_series(
+               DATE '2026-01-01',
+               DATE '2026-12-01',
+               INTERVAL '1 month')::date AS month_start
+)
+
+SELECT
+    am.month_start,
+    COALESCE(mr.month_rev, 0)                                   AS month_revenue,
+    SUM(COALESCE(mr.month_rev, 0))
+        OVER (ORDER BY am.month_start
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total
+FROM all_months AS am
+LEFT JOIN monthly_rev AS mr
+       ON mr.month_start = am.month_start
+ORDER BY am.month_start",,
+openai/gpt-oss-120b / v1,H06,hard,How many orders have a total amount that does not equal the sum of quantity times unit price of their items?,unknown_column,column o.id does not exist,"SELECT COUNT(*) AS orders_with_mismatched_total
+FROM (
+        SELECT  o.id,
+                o.total_amount,                                 
+                SUM( oi.quantity *
+                     COALESCE(oi.unit_price, mi.unit_price) )   
+                AS items_total
+        FROM    orders      AS o
+        JOIN    order_items AS oi
+               ON oi.order_id = o.id
+         
+        LEFT JOIN menu_items  AS mi
+               ON mi.id = oi.menu_item_id
+        GROUP BY o.id, o.total_amount
+        HAVING
+             
+            ABS(o.total_amount - SUM( oi.quantity *
+                                      COALESCE(oi.unit_price, mi.unit_price) )) > 0.01
+     ) AS mismatched",,
+openai/gpt-oss-120b / v1,H08,hard,"For each menu category, which item has brought in the most revenue? Show category, item name and revenue.",unknown_column,column oi.menu_item_id does not exist,"WITH item_revenue AS (
+    SELECT
+        mi.category,
+        mi.name               AS item_name,
+        SUM(oi.quantity * oi.unit_price) AS revenue
+    FROM menu_items   mi
+    JOIN order_items  oi
+          ON oi.menu_item_id = mi.id
+    GROUP BY
+        mi.category,
+        mi.name
+),
+
+ 
+ranked_items AS (
+    SELECT
+        category,
+        item_name,
+        revenue,
+        ROW_NUMBER() OVER (PARTITION BY category
+                           ORDER BY revenue DESC) AS rn
+    FROM item_revenue
+)
+
+
+SELECT
+    category,
+    item_name,
+    revenue
+FROM ranked_items
+WHERE rn = 1
+ORDER BY category",,
+openai/gpt-oss-120b / v1,H09,hard,What percentage of orders include at least one drink? Round to 2 decimal places.,unknown_column,column mi.menu_item_id does not exist,"SELECT
+    ROUND(
+        100.0 *
+        COUNT(DISTINCT o.order_id)                                   
+        / NULLIF( (SELECT COUNT(*) FROM orders), 0 ),                 
+        2
+    ) AS drink_order_percentage
+FROM orders        AS o
+JOIN order_items   AS oi ON oi.order_id = o.order_id
+JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE mi.category = 'Drink'",,
+openai/gpt-oss-120b / v1,H10,hard,Which hour of the day has the highest average order total?,unknown_column,column o.id does not exist,"WITH order_totals AS (
+    SELECT
+        o.id                                   AS order_id,
+        EXTRACT(HOUR FROM o.order_time)        AS order_hour,   
+        SUM(oi.quantity * mi.price)            AS order_total
+    FROM orders      AS o
+    JOIN order_items AS oi ON oi.order_id = o.id
+    JOIN menu_items  AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.id, order_hour
+)
+
+ 
+SELECT
+    order_hour,
+    AVG(order_total) AS avg_order_total
+FROM order_totals
+GROUP BY order_hour
+ORDER BY avg_order_total DESC
+LIMIT 1",,
+openai/gpt-oss-120b / v1,U01,unanswerable,Which ingredient is used in the most pizzas?,hallucinated_answer,answered a question the data cannot support,"SELECT
+    i.ingredient_id,
+    i.name,
+    COUNT(DISTINCT mi.menu_item_id) AS pizza_cnt
+FROM
+    ingredients                AS i
+JOIN
+    menu_item_ingredients      AS mi_ing
+        ON i.ingredient_id = mi_ing.ingredient_id
+JOIN
+    menu_items                 AS mi
+        ON mi_ing.menu_item_id = mi.menu_item_id
+WHERE
+    mi.category = 'Pizza'          
+GROUP BY
+    i.ingredient_id,
+    i.name
+ORDER BY
+    pizza_cnt DESC
+LIMIT 1",,
+openai/gpt-oss-120b / v1,U02,unanswerable,What is the average delivery time for each store?,hallucinated_answer,answered a question the data cannot support,delivered_at - order_placed_at,,
+openai/gpt-oss-120b / v2,E04,easy,What is the price of the Large Pepperoni Pizza?,wrong_row_count,"0 rows, expected 1","SELECT price
+FROM menu_items
+WHERE name = 'Pepperoni Pizza'
+  AND size = 'Large'",wrong_value_assumption,"Assumed the menu name is 'Pepperoni Pizza' with size 'Large'; the stored name is 'Large Pepperoni Pizza', so no row matched."
+openai/gpt-oss-120b / v2,M07,medium,"Show total revenue for each month of 2026, in month order.",wrong_values,,"SELECT DATE_TRUNC('month', order_timestamp) AS month,
+       SUM(total_amount) AS total_revenue
+FROM orders
+WHERE EXTRACT(YEAR FROM order_timestamp) = 2026
+GROUP BY DATE_TRUNC('month', order_timestamp)
+ORDER BY month",format_only,Returned each month as a date (2026-01-01) instead of a month number; the revenue figures match the gold answer exactly.
+openai/gpt-oss-120b / v2,H02,hard,"For each month of 2026, show the revenue and the change in revenue from the previous month, in month order.",wrong_values,,"WITH monthly_rev AS (
+    SELECT DATE_TRUNC('month', order_timestamp) AS month,
+           SUM(total_amount) AS revenue
+    FROM orders
+    WHERE order_timestamp >= DATE '2026-01-01'
+      AND order_timestamp <  DATE '2027-01-01'
+    GROUP BY DATE_TRUNC('month', order_timestamp)
+)
+SELECT month,
+       revenue,
+       revenue - LAG(revenue) OVER (ORDER BY month) AS revenue_change
+FROM monthly_rev
+ORDER BY month",format_only,Month shown as a date instead of a month number; revenue and month-on-month change values are all correct.
+openai/gpt-oss-120b / v2,H05,hard,"Show the running total of revenue by month for 2026, in month order.",wrong_values,,"WITH monthly_revenue AS (
+    SELECT DATE_TRUNC('month', order_timestamp) AS month,
+           SUM(total_amount) AS month_total
+    FROM orders
+    WHERE EXTRACT(YEAR FROM order_timestamp) = 2026
+    GROUP BY month
+)
+SELECT month,
+       SUM(month_total) OVER (ORDER BY month) AS running_total
+FROM monthly_revenue
+ORDER BY month",format_only,Month shown as a date instead of a month number; running-total values are all correct.
+openai/gpt-oss-20b / v1,E04,easy,What is the price of the Large Pepperoni Pizza?,wrong_row_count,"0 rows, expected 1","SELECT mi.price
+FROM menu_items AS mi
+WHERE mi.name  = 'Pepperoni Pizza'
+  AND mi.size  = 'Large'",,
+openai/gpt-oss-20b / v1,E06,easy,"What is the average order total, rounded to 2 decimal places?",unknown_column,column oi.menu_item_id does not exist,"SELECT ROUND(AVG(order_total), 2) AS avg_order_total
+FROM (
+    SELECT o.order_id,
+           SUM(oi.quantity * mi.price) AS order_total
+    FROM orders          AS o
+    JOIN order_items     AS oi ON o.order_id = oi.order_id
+    JOIN menu_items      AS mi ON oi.menu_item_id = mi.menu_item_id
+    GROUP BY o.order_id
+) AS per_order",,
+openai/gpt-oss-20b / v1,E08,easy,What is the largest single order total?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    o.order_id,
+    SUM(oi.quantity * mi.price) AS order_total
+FROM
+    orders          AS o
+JOIN
+    order_items     AS oi ON o.order_id = oi.order_id
+JOIN
+    menu_items      AS mi ON oi.menu_item_id = mi.menu_item_id
+GROUP BY
+    o.order_id
+ORDER BY
+    order_total DESC
+LIMIT 1",,
+openai/gpt-oss-20b / v1,E12,easy,How many orders were placed in March 2026?,unknown_column,"column ""order_date"" does not exist","SELECT COUNT(*) AS orders_in_march_2026
+FROM orders
+WHERE order_date >= DATE '2026-03-01'      
+  AND order_date <  DATE '2026-04-01'",,
+openai/gpt-oss-20b / v1,M01,medium,How many orders did each city receive?,unknown_column,column s.id does not exist,"SELECT
+    s.city,
+    COUNT(*) AS orders_received
+FROM
+    orders o
+    JOIN stores s
+        ON o.store_id = s.id          
+GROUP BY
+    s.city
+ORDER BY
+    orders_received DESC",,
+openai/gpt-oss-20b / v1,M02,medium,"Show the total revenue for each store, from highest to lowest.",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    st.store_id,
+    st.store_name,                     
+    SUM(mi.price * oi.quantity) AS total_revenue
+FROM
+    stores          AS st
+    JOIN orders      AS o   ON o.store_id   = st.store_id
+    JOIN order_items AS oi  ON oi.order_id  = o.order_id
+    JOIN menu_items  AS mi  ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    st.store_id,
+    st.store_name
+ORDER BY
+    total_revenue DESC",,
+openai/gpt-oss-20b / v1,M03,medium,What is the address of the store with the highest total revenue?,unknown_column,column s.id does not exist,"WITH store_rev AS (
+    SELECT
+        s.id          AS store_id,
+        s.address,
+        SUM(oi.quantity * COALESCE(oi.price, mi.price)) AS revenue
+    FROM stores          s
+    JOIN orders          o  ON o.store_id = s.id
+    JOIN order_items     oi ON oi.order_id = o.id
+    LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
+    GROUP BY s.id, s.address
+)
+
+ 
+SELECT
+    address
+FROM store_rev
+ORDER BY revenue DESC
+LIMIT 1",,
+openai/gpt-oss-20b / v1,M04,medium,How many units have been sold in each menu category?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.category,
+    SUM(oi.quantity) AS units_sold
+FROM
+    order_items AS oi
+JOIN
+    menu_items AS mi
+    ON oi.menu_item_id = mi.id
+GROUP BY
+    mi.category
+ORDER BY
+    units_sold DESC",,
+openai/gpt-oss-20b / v1,M05,medium,Which menu item has sold the most units?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.id,
+    mi.name,
+    SUM(oi.quantity) AS units_sold
+FROM
+    order_items oi
+JOIN
+    menu_items mi
+    ON oi.menu_item_id = mi.id
+GROUP BY
+    mi.id,
+    mi.name
+ORDER BY
+    units_sold DESC
+LIMIT 1",,
+openai/gpt-oss-20b / v1,M06,medium,"Who are the top 5 customers by total amount spent? Show first name, last name and total spent, highest first.",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    c.first_name,
+    c.last_name,
+    SUM(oi.quantity * mi.price) AS total_spent
+FROM
+    customers          AS c
+JOIN
+    orders             AS o   ON o.customer_id = c.customer_id
+JOIN
+    order_items        AS oi  ON oi.order_id   = o.order_id
+JOIN
+    menu_items         AS mi  ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    c.customer_id,
+    c.first_name,
+    c.last_name
+ORDER BY
+    total_spent DESC
+LIMIT 5",,
+openai/gpt-oss-20b / v1,M07,medium,"Show total revenue for each month of 2026, in month order.",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    
+    to_char(date_trunc('month', o.order_date), 'YYYY-MM') AS month,
+
+    
+    SUM(oi.quantity * mi.price) AS total_revenue
+FROM
+    orders          AS o
+JOIN
+    order_items     AS oi
+      ON oi.order_id = o.order_id
+JOIN
+    menu_items      AS mi
+      ON mi.menu_item_id = oi.menu_item_id
+WHERE
+    
+    o.order_date >= DATE '2026-01-01'
+    AND o.order_date <  DATE '2027-01-01'
+GROUP BY
+    month
+ORDER BY
+    month",,
+openai/gpt-oss-20b / v1,M09,medium,How many customers have never placed an order?,unknown_column,column c.id does not exist,"SELECT COUNT(*) AS customers_never_ordered
+FROM customers c
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM orders o
+    WHERE o.customer_id = c.id
+)",,
+openai/gpt-oss-20b / v1,M11,medium,What is the total revenue from items in the Drink category?,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    SUM(oi.quantity * mi.price) AS total_drink_revenue
+FROM
+    order_items AS oi
+JOIN
+    menu_items AS mi
+      ON oi.menu_item_id = mi.id
+WHERE
+    mi.category = 'Drink'",,
+openai/gpt-oss-20b / v1,M12,medium,Which day of the week has the most orders?,unknown_column,"column ""order_date"" does not exist","SELECT
+    to_char(order_date, 'FMDay') AS day_of_week,   
+    COUNT(*)                                 AS order_count
+FROM orders
+GROUP BY day_of_week
+ORDER BY order_count DESC
+LIMIT 1",,
+openai/gpt-oss-20b / v1,M13,medium,"For the Abuja store, how many orders were placed and what was the total revenue?",unknown_column,column mi.menu_item_id does not exist,"SELECT
+    COUNT(DISTINCT o.order_id)          AS orders_placed,
+    SUM(oi.quantity * mi.price)         AS total_revenue
+FROM orders          AS o
+JOIN stores          AS s  ON o.store_id = s.store_id
+JOIN order_items     AS oi ON oi.order_id = o.order_id
+JOIN menu_items      AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE s.store_name = 'Abuja'",,
+openai/gpt-oss-20b / v1,M14,medium,"What is the average order total in each city, rounded to 2 decimal places?",unknown_column,column mi.menu_item_id does not exist,"WITH order_totals AS (
+    SELECT
+        o.order_id,
+        s.city,
+        SUM(oi.quantity * mi.price) AS order_total
+    FROM orders          AS o
+    JOIN order_items     AS oi ON oi.order_id = o.order_id
+    JOIN menu_items      AS mi ON mi.menu_item_id = oi.menu_item_id
+    JOIN customers       AS c  ON c.customer_id = o.customer_id
+    JOIN stores          AS s  ON s.store_id = c.store_id
+    GROUP BY o.order_id, s.city
+)
+
+ 
+SELECT
+    city,
+    ROUND(AVG(order_total), 2) AS avg_order_total
+FROM order_totals
+GROUP BY city
+ORDER BY city",,
+openai/gpt-oss-20b / v1,M15,medium,"How many pizzas of each size (Small, Medium, Large) have been sold?",unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.size,
+    SUM(oi.quantity) AS total_pizzas
+FROM
+    order_items   AS oi
+JOIN
+    menu_items    AS mi
+      ON oi.menu_item_id = mi.id
+WHERE
+     
+    mi.category = 'Pizza'          
+GROUP BY
+    mi.size
+ORDER BY
+    mi.size",,
+openai/gpt-oss-20b / v1,H01,hard,"For each store, which menu item has sold the most units? Show the store ID and item name.",unknown_column,column o.id does not exist,"WITH sales AS (
+    SELECT
+        o.store_id,
+        mi.id          AS menu_item_id,
+        mi.name        AS item_name,
+        SUM(oi.quantity) AS units_sold
+    FROM orders          AS o
+    JOIN order_items     AS oi ON oi.order_id = o.id
+    JOIN menu_items      AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.store_id, mi.id, mi.name
+)
+
+ 
+SELECT
+    s.store_id,
+    s.item_name
+FROM (
+    SELECT
+        store_id,
+        item_name,
+        units_sold,
+        ROW_NUMBER() OVER (PARTITION BY store_id
+                           ORDER BY units_sold DESC) AS rn
+    FROM sales
+) s
+WHERE s.rn = 1",,
+openai/gpt-oss-20b / v1,H02,hard,"For each month of 2026, show the revenue and the change in revenue from the previous month, in month order.",unknown_column,column o.id does not exist,"WITH monthly_rev AS (
+    SELECT
+        date_trunc('month', o.order_date) AS month_start,
+        SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS revenue
+    FROM orders          AS o
+    JOIN order_items     AS oi ON oi.order_id = o.id
+    JOIN menu_items      AS mi ON mi.id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'
+    GROUP BY month_start
+)
+
+SELECT
+    to_char(month_start, 'YYYY-MM')          AS month,
+    revenue,
+    revenue - LAG(revenue) OVER (ORDER BY month_start) AS revenue_change
+FROM monthly_rev
+ORDER BY month_start",,
+openai/gpt-oss-20b / v1,H03,hard,What percentage of total item revenue comes from each menu category? Round to 2 decimal places.,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.category,
+    ROUND(
+        100.0 * SUM(mi.price * oi.quantity)          
+        / SUM(SUM(mi.price * oi.quantity)) OVER ()    
+        , 2)                                          
+    AS pct_revenue
+FROM
+    order_items  oi
+JOIN
+    menu_items   mi
+      ON oi.menu_item_id = mi.id
+GROUP BY
+    mi.category
+ORDER BY
+    pct_revenue DESC",,
+openai/gpt-oss-20b / v1,H04,hard,How many customers placed their very first order in January 2026?,unknown_column,"column ""order_date"" does not exist","SELECT COUNT(*) AS customers_in_jan_2026
+FROM (
+        SELECT customer_id,
+               MIN(order_date) AS first_order_date
+        FROM orders
+        GROUP BY customer_id
+     ) AS first_orders
+WHERE first_order_date >= DATE '2026-01-01'
+  AND first_order_date <  DATE '2026-02-01'",,
+openai/gpt-oss-20b / v1,H05,hard,"Show the running total of revenue by month for 2026, in month order.",unknown_column,column o.id does not exist,"SELECT
+    to_char(month_start, 'YYYY-MM')          AS month,
+    revenue,
+    SUM(revenue) OVER (ORDER BY month_start) AS running_total
+FROM (
+    SELECT
+        date_trunc('month', o.order_date) AS month_start,
+        SUM(oi.quantity * mi.price)       AS revenue
+    FROM orders          AS o
+    JOIN order_items     AS oi ON oi.order_id = o.id
+    JOIN menu_items      AS mi ON mi.id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'
+    GROUP BY month_start
+) AS per_month
+ORDER BY month_start",,
+openai/gpt-oss-20b / v1,H07,hard,Which customers placed 7 or more orders at Lagos stores? Show customer ID and order count.,unknown_column,column s.location does not exist,"SELECT
+    o.customer_id,
+    COUNT(*) AS order_count
+FROM
+    orders      AS o
+JOIN
+    stores      AS s
+      ON o.store_id = s.store_id
+WHERE
+    s.location = 'Lagos'          
+GROUP BY
+    o.customer_id
+HAVING
+    COUNT(*) >= 7",,
+openai/gpt-oss-20b / v1,H08,hard,"For each menu category, which item has brought in the most revenue? Show category, item name and revenue.",unknown_column,column oi.menu_item_id does not exist,"WITH item_rev AS (
+    SELECT
+        mi.category,
+        mi.name          AS item_name,
+        SUM(oi.quantity * mi.price) AS revenue
+    FROM order_items      AS oi
+    JOIN menu_items       AS mi
+          ON oi.menu_item_id = mi.id
+    GROUP BY mi.category, mi.name
+),
+
+
+ranked AS (
+    SELECT
+        category,
+        item_name,
+        revenue,
+        ROW_NUMBER() OVER (PARTITION BY category
+                           ORDER BY revenue DESC) AS rn
+    FROM item_rev
+)
+
+
+SELECT
+    category,
+    item_name,
+    revenue
+FROM ranked
+WHERE rn = 1
+ORDER BY category",,
+openai/gpt-oss-20b / v1,H09,hard,What percentage of orders include at least one drink? Round to 2 decimal places.,unknown_column,column mi.menu_item_id does not exist,"WITH drink_orders AS (
+    SELECT DISTINCT o.order_id
+    FROM orders          AS o
+    JOIN order_items     AS oi ON oi.order_id = o.order_id
+    JOIN menu_items      AS mi ON mi.menu_item_id = oi.menu_item_id
+     
+    WHERE mi.is_drink = true          
+)
+
+ 
+SELECT ROUND(
+           100.0 * COUNT(*) / (SELECT COUNT(*) FROM orders),
+           2
+       ) AS pct_orders_with_drink
+FROM drink_orders",,
+openai/gpt-oss-20b / v1,H10,hard,Which hour of the day has the highest average order total?,unknown_column,column o.id does not exist,"WITH order_totals AS (
+    SELECT
+        o.id          AS order_id,
+        o.order_time,
+        SUM(mi.price * oi.quantity) AS total
+    FROM orders          AS o
+    JOIN order_items     AS oi ON oi.order_id = o.id
+    JOIN menu_items      AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.id, o.order_time
+)
+
+SELECT
+    EXTRACT(HOUR FROM order_time) AS order_hour,
+    AVG(total)                     AS avg_order_total
+FROM order_totals
+GROUP BY order_hour
+ORDER BY avg_order_total DESC
+LIMIT 1",,
+openai/gpt-oss-20b / v1,U01,unanswerable,Which ingredient is used in the most pizzas?,hallucinated_answer,answered a question the data cannot support,"SELECT
+    i.ingredient_name,
+    COUNT(DISTINCT mi.menu_item_id) AS pizza_count
+FROM
+    ingredients AS i
+    JOIN menu_item_ingredients AS mii
+        ON i.ingredient_id = mii.ingredient_id
+    JOIN menu_items AS mi
+        ON mii.menu_item_id = mi.menu_item_id
+GROUP BY
+    i.ingredient_id,
+    i.ingredient_name
+ORDER BY
+    pizza_count DESC,
+    i.ingredient_name ASC          
+LIMIT 1",,
+openai/gpt-oss-20b / v1,U02,unanswerable,What is the average delivery time for each store?,hallucinated_answer,answered a question the data cannot support,"SELECT
+    s.store_id,
+    s.store_name,
+
+     
+    ROUND(
+        AVG( EXTRACT(EPOCH FROM (o.delivery_time - o.order_time)) ) / 60,
+        2
+    ) AS avg_delivery_minutes
+
+FROM
+    stores      AS s
+JOIN
+    orders      AS o
+      ON s.store_id = o.store_id
+
+ 
+WHERE
+    o.delivery_time IS NOT NULL          
+
+GROUP BY
+    s.store_id,
+    s.store_name
+
+ORDER BY
+    avg_delivery_minutes",,
+openai/gpt-oss-20b / v2,E04,easy,What is the price of the Large Pepperoni Pizza?,wrong_row_count,"0 rows, expected 1","SELECT price
+FROM menu_items
+WHERE name = 'Pepperoni Pizza' AND size = 'Large'",wrong_value_assumption,"Assumed the menu name is 'Pepperoni Pizza' with size 'Large'; the stored name is 'Large Pepperoni Pizza', so no row matched."
+openai/gpt-oss-20b / v2,M07,medium,"Show total revenue for each month of 2026, in month order.",wrong_values,,"SELECT
+    date_trunc('month', order_timestamp)::date AS month,
+    SUM(total_amount) AS revenue
+FROM orders
+WHERE order_timestamp >= '2026-01-01'
+  AND order_timestamp <  '2027-01-01'
+GROUP BY month
+ORDER BY month",format_only,Returned each month as a date (2026-01-01) instead of a month number; the revenue figures match the gold answer exactly.
+openai/gpt-oss-20b / v2,H02,hard,"For each month of 2026, show the revenue and the change in revenue from the previous month, in month order.",grouping_error,"column ""o.order_timestamp"" must appear in the GROUP BY clause or be used in an aggregate function","SELECT
+    to_char(date_trunc('month', o.order_timestamp), 'YYYY-MM') AS month,
+    SUM(oi.quantity * oi.unit_price) AS revenue,
+    SUM(oi.quantity * oi.unit_price) - LAG(SUM(oi.quantity * oi.unit_price)) OVER (ORDER BY date_trunc('month', o.order_timestamp)) AS change_from_prev_month
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.order_id
+WHERE EXTRACT(YEAR FROM o.order_timestamp) = 2026
+GROUP BY month
+ORDER BY month",sql_error,"Grouped by a text label (to_char) but ordered the LAG window by date_trunc of the raw timestamp, which PostgreSQL rejects as a GROUP BY error."
+openai/gpt-oss-20b / v2,H05,hard,"Show the running total of revenue by month for 2026, in month order.",wrong_values,,"SELECT month_start,
+       running_total
+FROM (
+    SELECT month_start,
+           SUM(total_amount) AS month_total,
+           SUM(SUM(total_amount)) OVER (ORDER BY month_start) AS running_total
+    FROM (
+        SELECT date_trunc('month', order_timestamp) AS month_start,
+               total_amount
+        FROM orders
+        WHERE EXTRACT(year FROM order_timestamp) = 2026
+    ) AS sub
+    GROUP BY month_start
+) AS agg
+ORDER BY month_start",format_only,Month shown as a date instead of a month number; running-total values are all correct.

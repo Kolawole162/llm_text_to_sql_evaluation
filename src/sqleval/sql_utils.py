@@ -10,13 +10,19 @@ FORBIDDEN = re.compile(
 )
 
 
+def strip_comments(sql):
+    """Remove -- line comments and /* block */ comments."""
+    sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
+    return re.sub(r"--[^\n]*", "", sql)
+
+
 def extract_sql(reply):
     """Return the SQL from a reply, or None if there is none."""
     if reply is None:
         return None
     match = FENCE.search(reply)
     text = match.group(1) if match else reply
-    text = text.strip()
+    text = strip_comments(text).strip()
     # Without a code block, start from the first SELECT/WITH (skips "Here is the query:").
     if not match:
         start = re.search(r"\b(select|with)\b", text, re.IGNORECASE)

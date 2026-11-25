@@ -1,0 +1,39 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rushmore
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Unit tests
+        run: pytest -v
+      - name: Load the database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for f in db/01_schema.sql db/02_data.sql db/03_readonly_role.sql; do
+            psql -h localhost -p 5434 -U postgres -d rushmore -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+      - name: Self-check (gold answers must score 100%)
+        env:
+          PYTHONPATH: src
+        run: python -m sqleval.run_eval --model gold

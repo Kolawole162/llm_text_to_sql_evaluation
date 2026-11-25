@@ -1,0 +1,2071 @@
+id,difficulty,question,model,prompt,correct,error_type,error_message,sql,reply,seconds,prompt_tokens,completion_tokens
+E01,easy,How many customers are there?,openai/gpt-oss-120b,v1,True,,,"SELECT COUNT(*) AS total_customers
+FROM   customers","**SQL (PostgreSQL)**  
+
+```sql
+SELECT COUNT(*) AS total_customers
+FROM   customers;
+```
+
+*Explanation*
+
+- `customers` is the table that stores one row per customer.  
+- `COUNT(*)` tallies every row, giving the total number of customers in the database.  
+- If you want to be extra‑safe against duplicate rows (e.g., if the table had a non‑unique key), you could count distinct primary‑key values instead:
+
+```sql
+SELECT COUNT(DISTINCT customer_id) AS total_customers
+FROM   customers;
+```
+
+Replace `customer_id` with the actual primary‑key column name if it differs.",1.5,108,230
+E02,easy,How many orders have been placed in total?,openai/gpt-oss-120b,v1,True,,,"SELECT COUNT(*) AS total_orders
+FROM   orders","**SQL**
+
+```sql
+SELECT COUNT(*) AS total_orders
+FROM   orders;
+```
+
+**Explanation**
+
+- The `orders` table (by convention) contains one row per order placed.
+- `COUNT(*)` tallies every row, giving the total number of orders that have been recorded in the system.
+- The result column is aliased as `total_orders` for readability.",1.09,111,129
+E03,easy,List the city and address of every store.,openai/gpt-oss-120b,v1,True,,,"SELECT
+    city,
+    address
+FROM
+    stores","**SQL**
+
+```sql
+SELECT
+    city,
+    address
+FROM
+    stores;
+```
+
+*Explanation*
+
+- The `stores` table holds the information about each store location.  
+- By selecting the `city` and `address` columns you get a list of every store’s city and its street address.  
+
+If the address column has a different name in your schema (e.g., `address_line`, `street_address`, etc.), just replace `address` with the appropriate column name.",1.15,111,168
+E04,easy,What is the price of the Large Pepperoni Pizza?,openai/gpt-oss-120b,v1,False,unknown_column,column mi.item_name does not exist,"SELECT
+    mi.price
+FROM
+    menu_items AS mi
+WHERE
+    mi.item_name = 'Large Pepperoni Pizza'","**SQL**
+
+```sql
+SELECT
+    mi.price
+FROM
+    menu_items AS mi
+WHERE
+    mi.item_name = 'Large Pepperoni Pizza'      -- exact name
+    -- or, if size and name are stored in separate columns:
+    -- mi.item_name = 'Pepperoni Pizza' AND mi.size = 'Large'
+;
+```
+
+**Explanation**
+
+- The `menu_items` table (by convention) holds each menu offering together with its price.
+- If the table stores the full description in a single column (e.g., `item_name`), you can match that exact string.
+- If the table splits the description into separate columns (e.g., `item_name` for the base pizza and `size` for the size), you would filter on both columns as shown in the commented line.  
+
+Running the query will return a single row containing the price of the **Large Pepperoni Pizza**.",1.65,113,311
+E05,easy,How many menu items are there in each category?,openai/gpt-oss-120b,v1,True,,,"SELECT
+    mi.category,
+    COUNT(*) AS menu_item_count
+FROM
+    menu_items AS mi
+GROUP BY
+    mi.category
+ORDER BY
+    mi.category","**SQL (PostgreSQL)**  
+
+```sql
+SELECT
+    mi.category,
+    COUNT(*) AS menu_item_count
+FROM
+    menu_items AS mi
+GROUP BY
+    mi.category
+ORDER BY
+    mi.category;
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| `FROM menu_items AS mi` | Reads the table that stores each menu item. |
+| `GROUP BY mi.category`   | Groups the rows by the `category` column (e.g., “Appetizer”, “Main”, “Dessert”, …). |
+| `COUNT(*)`               | Counts how many rows (i.e., menu items) belong to each group. |
+| `SELECT mi.category, COUNT(*) AS menu_item_count` | Returns the category name together with its item count. |
+| `ORDER BY mi.category`   | Sorts the result alphabetically (optional, but makes the output easier to read). |
+
+If you also need to show categories that currently have **zero** items (for example, if categories are defined in a separate lookup table), you could left‑join that lookup table to `menu_items`. Assuming a table `categories(id, name)`, the query would be:
+
+```sql
+SELECT
+    c.name   AS category,
+    COUNT(mi.id) AS menu_item_count
+FROM
+    categories AS c
+LEFT JOIN
+    menu_items AS mi
+      ON mi.category = c.name          -- or mi.category_id = c.id, depending on the schema
+GROUP BY
+    c.name
+ORDER BY
+    c.name;
+```
+
+But with only the `menu_items` table available, the first query gives you the count of menu items per existing category.",1.77,112,457
+E06,easy,"What is the average order total, rounded to 2 decimal places?",openai/gpt-oss-120b,v1,False,unknown_column,column mi.id does not exist,"SELECT ROUND(AVG(order_total), 2) AS avg_order_total
+FROM (
+         
+        SELECT  oi.order_id,
+                SUM(oi.quantity * mi.price) AS order_total
+        FROM    order_items   AS oi
+        JOIN    menu_items    AS mi
+               ON mi.id = oi.menu_item_id
+         
+        GROUP BY oi.order_id
+     ) AS per_order","**SQL**
+
+```sql
+/*  Average order total (rounded to 2 decimal places)  */
+SELECT ROUND(AVG(order_total), 2) AS avg_order_total
+FROM (
+        /*  Total for each individual order  */
+        SELECT  oi.order_id,
+                SUM(oi.quantity * mi.price) AS order_total
+        FROM    order_items   AS oi
+        JOIN    menu_items    AS mi
+               ON mi.id = oi.menu_item_id
+        /*  If you only want to count orders that are “completed” you can
+            join the orders table and filter on its status, e.g.:
+
+            JOIN orders o ON o.id = oi.order_id
+            WHERE o.status = 'completed'
+        */
+        GROUP BY oi.order_id
+     ) AS per_order;
+```
+
+**Explanation**
+
+1. **Inner query (`per_order`)**  
+   * Joins `order_items` with `menu_items` to get the price of each menu item.  
+   * Multiplies the quantity ordered (`oi.quantity`) by the item price (`mi.price`).  
+   * Sums those line‑item amounts per `order_id` → gives the total amount for each order.
+
+2. **Outer query**  
+   * Takes the average of all the per‑order totals (`AVG(order_total)`).  
+   * Rounds the result to two decimal places with `ROUND(..., 2)`.
+
+If you need to restrict the calculation to a subset of orders (e.g., only orders from a particular store, date range, or status), simply add the appropriate `JOIN`/`WHERE` clauses in the inner query.",2.28,116,567
+E07,easy,Which menu items cost more than 7000? Show the name and price.,openai/gpt-oss-120b,v1,True,,,"SELECT
+    name,
+    price
+FROM
+    menu_items
+WHERE
+    price > 7000","**SQL**
+
+```sql
+SELECT
+    name,
+    price
+FROM
+    menu_items
+WHERE
+    price > 7000;
+```
+
+**Explanation**
+
+- `menu_items` is the table that holds each dish’s details (e.g., `id`, `name`, `price`, …).  
+- The `WHERE` clause filters the rows to only those whose `price` exceeds **7000**.  
+- The `SELECT` list returns the two columns you asked for: the menu‑item **name** and its **price**.",1.76,118,256
+E08,easy,What is the largest single order total?,openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"WITH order_totals AS (
+    SELECT
+        o.id                     AS order_id,
+        SUM(oi.quantity * mi.price) AS total_amount
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id   = o.id
+    JOIN menu_items    AS mi ON mi.id         = oi.menu_item_id
+    GROUP BY o.id
+)
+
+ 
+SELECT
+    MAX(total_amount) AS largest_order_total
+FROM order_totals","**SQL – largest single order total**
+
+```sql
+/* 1️⃣  Compute the total for every order */
+WITH order_totals AS (
+    SELECT
+        o.id                     AS order_id,
+        SUM(oi.quantity * mi.price) AS total_amount
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id   = o.id
+    JOIN menu_items    AS mi ON mi.id         = oi.menu_item_id
+    GROUP BY o.id
+)
+
+/* 2️⃣  Return the highest total */
+SELECT
+    MAX(total_amount) AS largest_order_total
+FROM order_totals;
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| `order_totals` CTE | Joins `orders → order_items → menu_items` and multiplies each line‑item’s `quantity` by the menu‑item’s `price`. The `SUM` aggregates those line totals per `order_id`, giving the total amount for each order. |
+| Final `SELECT` | Takes the maximum of those per‑order totals, i.e., the largest single order total in the whole system. |
+
+*Alternative one‑liner (same result):*
+
+```sql
+SELECT
+    SUM(oi.quantity * mi.price) AS order_total
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+JOIN menu_items  mi ON mi.id = oi.menu_item_id
+GROUP BY o.id
+ORDER BY order_total DESC
+LIMIT 1;
+```
+
+Both queries return a single value – the highest order total across all stores, customers, and dates.",2.13,110,531
+E09,easy,How many ingredients have their stock measured in kg?,openai/gpt-oss-120b,v1,False,unknown_column,"column ""stock_unit"" does not exist","SELECT COUNT(*) AS ingredients_measured_in_kg
+FROM   ingredients
+WHERE  LOWER(stock_unit) = 'kg'","**SQL**
+
+```sql
+SELECT COUNT(*) AS ingredients_measured_in_kg
+FROM   ingredients
+WHERE  LOWER(stock_unit) = 'kg';
+```
+
+**Explanation**
+
+| Column (in `ingredients`) | Why it’s used |
+|---------------------------|---------------|
+| `stock_unit` (or similar) | Holds the unit of measure for the ingredient’s inventory (e.g., `kg`, `g`, `lb`, `pcs`). |
+| `LOWER(stock_unit) = 'kg'` | Makes the comparison case‑insensitive so that values like `KG`, `Kg`, or `kg` are all counted. |
+| `COUNT(*)` | Returns the total number of rows that satisfy the condition, i.e., the number of ingredients whose stock is measured in kilograms. |
+
+If the column that stores the unit of measure has a different name (e.g., `unit`, `measure`, `uom`), just replace `stock_unit` with the appropriate column name:
+
+```sql
+SELECT COUNT(*) AS ingredients_measured_in_kg
+FROM   ingredients
+WHERE  LOWER(<your_unit_column>) = 'kg';
+```
+
+This query will give you the exact count of ingredients whose inventory is tracked in kilograms.",1.82,112,356
+E10,easy,"List the 5 ingredients with the lowest stock quantity, lowest first.",openai/gpt-oss-120b,v1,True,,,"SELECT
+    i.ingredient_id,
+    i.name,
+    i.stock_quantity
+FROM
+    ingredients AS i
+ORDER BY
+    i.stock_quantity ASC          
+LIMIT 5","**SQL**
+
+```sql
+SELECT
+    i.ingredient_id,
+    i.name,
+    i.stock_quantity
+FROM
+    ingredients AS i
+ORDER BY
+    i.stock_quantity ASC          -- lowest quantity first
+LIMIT 5;                          -- only the 5 worst‑stocked ingredients
+```
+
+**Explanation**
+
+* `ingredients` is assumed to hold the current inventory for each ingredient (e.g., columns `ingredient_id`, `name`, `stock_quantity`).
+* The `ORDER BY … ASC` clause sorts the rows from the smallest quantity to the largest.
+* `LIMIT 5` returns only the five ingredients with the lowest stock levels.  
+
+If the stock is tracked per store (e.g., a separate `store_ingredients` table), you could aggregate it first:
+
+```sql
+SELECT
+    i.ingredient_id,
+    i.name,
+    SUM(si.stock_quantity) AS total_stock
+FROM
+    ingredients i
+JOIN
+    store_ingredients si ON si.ingredient_id = i.ingredient_id
+GROUP BY
+    i.ingredient_id, i.name
+ORDER BY
+    total_stock ASC
+LIMIT 5;
+```
+
+Adjust column names to match your actual schema.",1.75,116,376
+E11,easy,How many customers created their account in 2026?,openai/gpt-oss-120b,v1,True,,,"SELECT COUNT(*) AS customers_created_in_2026
+FROM   customers
+WHERE  EXTRACT(YEAR FROM created_at) = 2026","**SQL (PostgreSQL)**  
+
+```sql
+SELECT COUNT(*) AS customers_created_in_2026
+FROM   customers
+WHERE  EXTRACT(YEAR FROM created_at) = 2026;
+```
+
+**Explanation**
+
+| Clause | What it does |
+|--------|--------------|
+| `FROM customers` | Looks at the table that stores the user accounts. |
+| `EXTRACT(YEAR FROM created_at)` | Pulls the year part out of the timestamp (or date) column that records when the account was created. |
+| `WHERE … = 2026` | Keeps only rows whose creation year is 2026. |
+| `COUNT(*)` | Returns the total number of such rows. |
+
+> **Assumptions**  
+> * The `customers` table contains a column that records the account‑creation moment – commonly named `created_at`, `signup_date`, `created_on`, etc. If the column has a different name, replace `created_at` with the actual column name.  
+> * The column is of type `DATE`, `TIMESTAMP`, or `TIMESTAMPTZ`. `EXTRACT(YEAR …)` works with any of these types.  
+
+If you prefer to avoid `EXTRACT` and the column is a `DATE` (or you want to use an index on a date range), you can also write the filter as a range condition:
+
+```sql
+SELECT COUNT(*) AS customers_created_in_2026
+FROM   customers
+WHERE  created_at >= DATE '2026-01-01'
+  AND  created_at <  DATE '2027-01-01';
+```
+
+Both versions will give you the count of customers whose accounts were created at any point during the calendar year 2026.",1.99,113,435
+E12,easy,How many orders were placed in March 2026?,openai/gpt-oss-120b,v1,False,unknown_column,"column ""order_date"" does not exist","SELECT COUNT(*) AS orders_in_march_2026
+FROM   orders
+WHERE  order_date >= DATE '2026-03-01'      
+  AND  order_date <  DATE '2026-04-01'","**Assumptions**
+
+| Table | Relevant column(s) |
+|-------|--------------------|
+| `orders` | `order_id` (PK), `order_date` (a `DATE` or `TIMESTAMP` column that records when the order was placed) |
+
+If the column name or type is different, just replace it in the query accordingly.
+
+---
+
+### Query – Count of orders placed in March 2026
+
+```sql
+SELECT COUNT(*) AS orders_in_march_2026
+FROM   orders
+WHERE  order_date >= DATE '2026-03-01'      -- start of March 2026 (inclusive)
+  AND  order_date <  DATE '2026-04-01';     -- first day of April 2026 (exclusive)
+```
+
+**Explanation**
+
+1. **`DATE '2026-03-01'`** – the first moment of March 1, 2026.
+2. **`DATE '2026-04-01'`** – the first moment of April 1, 2026.  
+   Using `<` (strictly less than) guarantees that any timestamp on April 1 is excluded, while still capturing every possible time on March 31 (including `23:59:59.999…`).
+3. The `COUNT(*)` aggregates all rows that satisfy the date filter, giving the total number of orders placed during that month.
+
+---
+
+### Variations (if you need a different format)
+
+| Situation | Query |
+|-----------|-------|
+| `order_date` is a **timestamp with time zone** and you want to be explicit about the time zone (e.g., UTC) | ```sql SELECT COUNT(*) FROM orders WHERE order_date AT TIME ZONE 'UTC' >= TIMESTAMP '2026-03-01 00:00:00' AND order_date AT TIME ZONE 'UTC' < TIMESTAMP '2026-04-01 00:00:00'; ``` |
+| You prefer using the `EXTRACT` function | ```sql SELECT COUNT(*) FROM orders WHERE EXTRACT(YEAR FROM order_date) = 2026 AND EXTRACT(MONTH FROM order_date) = 3; ``` |
+| You need the result broken down by day | ```sql SELECT DATE_TRUNC('day', order_date)::date AS order_day, COUNT(*) AS orders_per_day FROM orders WHERE order_date >= DATE '2026-03-01' AND order_date < DATE '2026-04-01' GROUP BY order_day ORDER BY order_day; ``` |
+
+Feel free to adapt the column/table names to match your actual schema.",2.28,113,575
+M01,medium,How many orders did each city receive?,openai/gpt-oss-120b,v1,True,,,"SELECT
+    s.city,
+    COUNT(o.order_id) AS orders_received
+FROM
+    orders  AS o
+    JOIN stores AS s
+        ON o.store_id = s.store_id          
+GROUP BY
+    s.city
+ORDER BY
+    orders_received DESC","**Assumptions about the schema**
+
+| Table | Relevant columns for this query |
+|-------|---------------------------------|
+| `stores`      | `store_id` (PK), `city` |
+| `customers`   | `customer_id` (PK), `city` |
+| `orders`      | `order_id` (PK), `store_id` (FK → stores), `customer_id` (FK → customers) |
+| other tables (`ingredients`, `menu_items`, `order_items`) are not needed for this question. |
+
+The question *“How many orders did each city receive?”* can be interpreted in two common ways:
+
+1. **Orders counted per city of the store that fulfilled the order** (i.e., where the order was *received*).  
+2. **Orders counted per city of the customer who placed the order** (i.e., where the order was *delivered*).
+
+Both queries are shown below; pick the one that matches your business definition.
+
+---
+
+## 1️⃣ Orders per **store** city  
+
+```sql
+SELECT
+    s.city,
+    COUNT(o.order_id) AS orders_received
+FROM
+    orders  AS o
+    JOIN stores AS s
+        ON o.store_id = s.store_id          -- link order to the store that fulfilled it
+GROUP BY
+    s.city
+ORDER BY
+    orders_received DESC;                  -- optional: most active cities first
+```
+
+*Result* – one row per city where a store is located, with the total number of orders that were processed by stores in that city.
+
+---
+
+## 2️⃣ Orders per **customer** city  
+
+```sql
+SELECT
+    c.city,
+    COUNT(o.order_id) AS orders_received
+FROM
+    orders    AS o
+    JOIN customers AS c
+        ON o.customer_id = c.customer_id   -- link order to the customer who placed it
+GROUP BY
+    c.city
+ORDER BY
+    orders_received DESC;
+```
+
+*Result* – one row per city where customers live, showing how many orders originated from each city.
+
+---
+
+### Why `COUNT(o.order_id)` (instead of `COUNT(*)`)?
+
+* `COUNT(o.order_id)` counts only rows that have a non‑NULL `order_id`.  
+* Using `COUNT(*)` would give the same result here because `order_id` is the primary key and can never be NULL, but the explicit column makes the intention clear and protects the query if you ever add a `LEFT JOIN` later.
+
+---
+
+### Quick sanity‑check
+
+If you want to verify that the two definitions give different numbers (or the same, if every store is in the same city as its customers), you can run both queries side‑by‑side:
+
+```sql
+-- Store‑city view
+SELECT s.city,
+       COUNT(o.order_id) AS store_city_orders
+FROM   orders o
+JOIN   stores s ON o.store_id = s.store_id
+GROUP BY s.city
+ORDER BY store_city_orders DESC;
+
+-- Customer‑city view
+SELECT c.city,
+       COUNT(o.order_id) AS customer_city_orders
+FROM   orders o
+JOIN   customers c ON o.customer_id = c.customer_id
+GROUP BY c.city
+ORDER BY customer_city_orders DESC;
+```
+
+Pick the query that matches the business meaning of “city receive[d] orders”.",2.59,110,817
+M02,medium,"Show the total revenue for each store, from highest to lowest.",openai/gpt-oss-120b,v1,False,unknown_column,column mi.menu_item_id does not exist,"SELECT
+    s.store_id,
+    s.store_name,
+    SUM(oi.quantity * mi.price) AS total_revenue
+FROM   stores      AS s
+JOIN   orders      AS o  ON o.store_id   = s.store_id
+JOIN   order_items AS oi ON oi.order_id  = o.order_id
+JOIN   menu_items  AS mi ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    s.store_id,
+    s.store_name
+ORDER BY
+    total_revenue DESC","**SQL (PostgreSQL)**  
+
+```sql
+SELECT
+    s.store_id,
+    s.store_name,
+    SUM(oi.quantity * mi.price) AS total_revenue
+FROM   stores      AS s
+JOIN   orders      AS o  ON o.store_id   = s.store_id
+JOIN   order_items AS oi ON oi.order_id  = o.order_id
+JOIN   menu_items  AS mi ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    s.store_id,
+    s.store_name
+ORDER BY
+    total_revenue DESC;
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| `JOIN orders` | Links each order to the store where it was placed. |
+| `JOIN order_items` | Retrieves the line‑items (quantity of each menu item) for every order. |
+| `JOIN menu_items` | Brings in the current price of each menu item (`price`). |
+| `SUM(oi.quantity * mi.price)` | Calculates the revenue contributed by each line‑item (price × quantity) and aggregates it per store. |
+| `GROUP BY s.store_id, s.store_name` | Produces one row per store. |
+| `ORDER BY total_revenue DESC` | Sorts the result from the highest‑earning store down to the lowest. |
+
+*If the unit price is stored directly in `order_items` (e.g., a column `unit_price` that captures the price at the time of purchase), replace `mi.price` with `oi.unit_price` in the `SUM` expression.*",1.89,115,498
+M03,medium,What is the address of the store with the highest total revenue?,openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"WITH store_revenue AS (
+    SELECT
+        o.store_id,
+        SUM(oi.quantity * mi.price) AS total_revenue
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.id
+    JOIN menu_items    AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.store_id
+)
+
+ 
+SELECT s.address
+FROM   stores          AS s
+JOIN   store_revenue   AS r ON r.store_id = s.id
+ORDER BY r.total_revenue DESC
+LIMIT 1","**SQL (PostgreSQL)**  
+
+```sql
+/* 1️⃣  Compute total revenue per store
+   – revenue = sum( quantity × menu_item price )               */
+WITH store_revenue AS (
+    SELECT
+        o.store_id,
+        SUM(oi.quantity * mi.price) AS total_revenue
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.id
+    JOIN menu_items    AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.store_id
+)
+
+/* 2️⃣  Pick the store that has the highest revenue and return its address */
+SELECT s.address
+FROM   stores          AS s
+JOIN   store_revenue   AS r ON r.store_id = s.id
+ORDER BY r.total_revenue DESC
+LIMIT 1;
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| **CTE `store_revenue`** | Joins `orders → order_items → menu_items` to calculate the revenue contributed by each line‑item (`quantity * price`). The `SUM` aggregates this per `store_id`. |
+| **Final SELECT** | Joins the revenue result back to `stores` to fetch the store’s address. Ordering by `total_revenue` descending and limiting to `1` returns the address of the store with the highest total revenue. |
+
+*Assumptions about column names* (adjust if your schema differs):
+
+- `stores(id, address, …)`
+- `orders(id, store_id, …)`
+- `order_items(id, order_id, menu_item_id, quantity, …)`
+- `menu_items(id, price, …)`
+
+If you also need to break ties (multiple stores with the same top revenue), replace `LIMIT 1` with a `QUALIFY`/`ROW_NUMBER()` window function, e.g.:
+
+```sql
+SELECT address
+FROM (
+    SELECT s.address,
+           r.total_revenue,
+           ROW_NUMBER() OVER (ORDER BY r.total_revenue DESC) AS rn
+    FROM   stores s
+    JOIN   store_revenue r ON r.store_id = s.id
+) t
+WHERE rn = 1;
+```",2.51,115,688
+M04,medium,How many units have been sold in each menu category?,openai/gpt-oss-120b,v1,False,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.category,
+    SUM(oi.quantity) AS units_sold
+FROM
+    order_items AS oi
+JOIN
+    menu_items AS mi
+      ON oi.menu_item_id = mi.id
+GROUP BY
+    mi.category
+ORDER BY
+    units_sold DESC","**Assumptions about the schema**
+
+| Table | Relevant columns (for this query) |
+|-------|-----------------------------------|
+| `menu_items` | `id` (PK), `category` (e.g., *Appetizer*, *Main*, *Dessert*), … |
+| `order_items`| `order_id` (FK → `orders.id`), `menu_item_id` (FK → `menu_items.id`), `quantity` (number of units sold), … |
+| `orders`    | `id` (PK), `status` (optional – e.g. *completed*, *canceled*), … |
+
+The query simply aggregates the `quantity` column from `order_items` per menu‑item category.  
+If you only want to count *completed* orders, join the `orders` table and filter on its status; otherwise you can omit that join.
+
+---
+
+## 1. Basic version – count every order item
+
+```sql
+SELECT
+    mi.category,
+    SUM(oi.quantity) AS units_sold
+FROM
+    order_items AS oi
+JOIN
+    menu_items AS mi
+      ON oi.menu_item_id = mi.id
+GROUP BY
+    mi.category
+ORDER BY
+    units_sold DESC;          -- optional: show the most‑sold categories first
+```
+
+---
+
+## 2. Including only “completed” orders (if you have an order status column)
+
+```sql
+SELECT
+    mi.category,
+    SUM(oi.quantity) AS units_sold
+FROM
+    order_items AS oi
+JOIN
+    menu_items AS mi
+      ON oi.menu_item_id = mi.id
+JOIN
+    orders AS o
+      ON oi.order_id = o.id
+WHERE
+    o.status = 'completed'          -- adjust the value to match your enum/value
+GROUP BY
+    mi.category
+ORDER BY
+    units_sold DESC;
+```
+
+---
+
+### What the query does
+
+1. **Join `order_items` → `menu_items`** – gives us the category for each line‑item.
+2. (Optional) **Join `orders`** – lets us filter on order status, date range, store, etc.
+3. **`SUM(oi.quantity)`** – adds up the number of units sold for each line‑item.
+4. **`GROUP BY mi.category`** – aggregates the sum per menu category.
+5. **`ORDER BY units_sold DESC`** – (optional) shows the categories from highest to lowest sales.
+
+Feel free to adapt the `WHERE` clause (e.g., add a date range, a specific store, or a customer segment) without changing the overall structure.",2.6,113,735
+M05,medium,Which menu item has sold the most units?,openai/gpt-oss-120b,v1,False,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.menu_item_id,          
+    mi.name,                  
+    SUM(oi.quantity) AS units_sold
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.menu_item_id          
+GROUP BY
+    mi.menu_item_id,
+    mi.name
+ORDER BY
+    units_sold DESC               
+LIMIT 1","**SQL (PostgreSQL)**  
+
+```sql
+/*  Which menu item has sold the most units?  */
+SELECT
+    mi.menu_item_id,          -- primary key of the menu item
+    mi.name,                  -- human‑readable name (if you have it)
+    SUM(oi.quantity) AS units_sold
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.menu_item_id          -- link each order line to its menu item
+GROUP BY
+    mi.menu_item_id,
+    mi.name
+ORDER BY
+    units_sold DESC               -- biggest seller first
+LIMIT 1;                           -- keep only the top‑selling item
+```
+
+### How it works
+1. **`order_items`** stores each line of an order, typically with a `quantity` column that tells how many units of a given menu item were sold in that line.  
+2. By joining `order_items` to `menu_items` we can retrieve the menu‑item’s name (or any other descriptive columns).  
+3. `SUM(oi.quantity)` aggregates the total number of units sold for each menu item.  
+4. `GROUP BY` groups the rows by the menu‑item identifier (and any non‑aggregated columns you want to display).  
+5. Ordering the result by the summed quantity in descending order and limiting the output to **1** returns the single menu item with the highest total units sold.
+
+*If you want to see all items tied for the top spot, replace `LIMIT 1` with a window function, e.g.:*
+
+```sql
+WITH sales AS (
+    SELECT
+        mi.menu_item_id,
+        mi.name,
+        SUM(oi.quantity) AS units_sold
+    FROM   order_items oi
+    JOIN   menu_items  mi ON oi.menu_item_id = mi.menu_item_id
+    GROUP BY mi.menu_item_id, mi.name
+)
+SELECT *
+FROM   sales
+WHERE  units_sold = (SELECT MAX(units_sold) FROM sales);
+```
+
+Both queries will give you the menu item(s) that have sold the most units.",2.47,111,572
+M06,medium,"Who are the top 5 customers by total amount spent? Show first name, last name and total spent, highest first.",openai/gpt-oss-120b,v1,False,unknown_column,column mi.menu_item_id does not exist,"SELECT
+    c.first_name,
+    c.last_name,
+    SUM(oi.quantity * mi.price) AS total_spent
+FROM customers      AS c
+JOIN orders         AS o  ON o.customer_id = c.customer_id
+JOIN order_items    AS oi ON oi.order_id    = o.order_id
+JOIN menu_items     AS mi ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    c.customer_id,          
+    c.first_name,
+    c.last_name
+ORDER BY
+    total_spent DESC
+LIMIT 5","**SQL (PostgreSQL)**  
+
+```sql
+SELECT
+    c.first_name,
+    c.last_name,
+    SUM(oi.quantity * mi.price) AS total_spent
+FROM customers      AS c
+JOIN orders         AS o  ON o.customer_id = c.customer_id
+JOIN order_items    AS oi ON oi.order_id    = o.order_id
+JOIN menu_items     AS mi ON mi.menu_item_id = oi.menu_item_id
+GROUP BY
+    c.customer_id,          -- keep the PK in the GROUP BY (helps the planner)
+    c.first_name,
+    c.last_name
+ORDER BY
+    total_spent DESC
+LIMIT 5;
+```
+
+### How it works
+| Step | What happens |
+|------|--------------|
+| **1. Join the tables** | `customers → orders → order_items → menu_items` so we can reach the price of each menu item that a customer bought. |
+| **2. Compute line‑item amount** | `oi.quantity * mi.price` gives the amount for each line in an order. |
+| **3. Aggregate per customer** | `SUM(...)` adds up all line‑item amounts for a given customer, yielding the total amount they have spent. |
+| **4. Sort & limit** | Ordering by `total_spent DESC` puts the biggest spenders first; `LIMIT 5` returns only the top five. |
+
+### Assumptions about the schema
+| Table | Relevant columns used |
+|-------|-----------------------|
+| `customers`   | `customer_id` (PK), `first_name`, `last_name` |
+| `orders`      | `order_id` (PK), `customer_id` (FK) |
+| `order_items` | `order_id` (FK), `menu_item_id` (FK), `quantity` |
+| `menu_items`  | `menu_item_id` (PK), `price` |
+
+If your `orders` table already stores a pre‑calculated total (e.g., `order_total`), you could simplify the query to sum that column instead of recomputing from `order_items` and `menu_items`. The logic would be the same – just replace the `SUM(oi.quantity * mi.price)` with `SUM(o.order_total)`.",2.08,127,584
+M07,medium,"Show total revenue for each month of 2026, in month order.",openai/gpt-oss-120b,v1,False,unknown_column,column mi.menu_item_id does not exist,"SELECT
+    TO_CHAR(month_start, 'YYYY-MM')      AS month,          
+    SUM(oi.quantity * mi.price)          AS revenue
+FROM
+    orders          AS o
+    JOIN order_items AS oi ON oi.order_id = o.order_id
+    JOIN menu_items   AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE
+    o.order_date >= DATE '2026-01-01'          
+    AND o.order_date <  DATE '2027-01-01'      
+GROUP BY
+    month_start
+ORDER BY
+    month_start","**SQL (PostgreSQL)**  
+
+```sql
+/*  Total revenue per month for the year 2026  */
+SELECT
+    TO_CHAR(month_start, 'YYYY-MM')      AS month,          -- e.g. 2026-01
+    SUM(oi.quantity * mi.price)          AS revenue
+FROM
+    orders          AS o
+    JOIN order_items AS oi ON oi.order_id = o.order_id
+    JOIN menu_items   AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE
+    o.order_date >= DATE '2026-01-01'          -- start of 2026
+    AND o.order_date <  DATE '2027-01-01'      -- end of 2026 (exclusive)
+GROUP BY
+    month_start
+ORDER BY
+    month_start;
+```
+
+### How it works
+| Step | Explanation |
+|------|-------------|
+| **`DATE_TRUNC('month', o.order_date) AS month_start`** | Truncates each order’s timestamp to the first day of its month (e.g., `2026‑03‑01`). This value is used for grouping and ordering. |
+| **`WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01'`** | Limits the rows to orders that occurred in the calendar year 2026. |
+| **`SUM(oi.quantity * mi.price)`** | Calculates the revenue contributed by each line‑item (`quantity × unit price`) and then aggregates it per month. |
+| **`GROUP BY month_start`** | Produces one result row per month. |
+| **`ORDER BY month_start`** | Returns the months in chronological order (January → December). |
+| **`TO_CHAR(month_start, 'YYYY-MM') AS month`** | Formats the month key as a readable string like `2026-04`. |
+
+### What you need in the schema
+| Table | Relevant columns used in the query |
+|-------|-------------------------------------|
+| `orders`      | `order_id` (PK), `order_date` (timestamp) |
+| `order_items`| `order_id` (FK), `menu_item_id` (FK), `quantity` |
+| `menu_items` | `menu_item_id` (PK), `price` (numeric/decimal) |
+
+If your `orders` table already stores a pre‑calculated total (e.g., `total_amount`), you can simplify the query to:
+
+```sql
+SELECT
+    TO_CHAR(DATE_TRUNC('month', order_date), 'YYYY-MM') AS month,
+    SUM(total_amount)                                   AS revenue
+FROM orders
+WHERE order_date >= DATE '2026-01-01'
+  AND order_date <  DATE '2027-01-01'
+GROUP BY DATE_TRUNC('month', order_date)
+ORDER BY DATE_TRUNC('month', order_date);
+```
+
+Both versions return the same result – the total revenue earned in each month of 2026, listed from January through December.",2.48,117,755
+M08,medium,How many different customers have placed at least one order?,openai/gpt-oss-120b,v1,True,,,"SELECT COUNT(DISTINCT o.customer_id) AS num_customers
+FROM   orders AS o","**SQL**
+
+```sql
+SELECT COUNT(DISTINCT o.customer_id) AS num_customers
+FROM   orders AS o;
+```
+
+**Explanation**
+
+- The `orders` table records each order and (presumably) contains a `customer_id` column that references the `customers` table.  
+- `DISTINCT` removes duplicate `customer_id` values so we count each customer only once, even if they placed many orders.  
+- `COUNT(*)` (or `COUNT(1)`) then returns the total number of unique customers who have placed at least one order.  
+
+If you want to be extra‑safe that the IDs actually exist in the `customers` table, you can join:
+
+```sql
+SELECT COUNT(DISTINCT o.customer_id) AS num_customers
+FROM   orders AS o
+JOIN   customers AS c
+       ON c.id = o.customer_id;
+```
+
+Both queries will give you the number of different customers who have placed at least one order.",1.48,113,268
+M09,medium,How many customers have never placed an order?,openai/gpt-oss-120b,v1,True,,,"SELECT COUNT(*) AS customers_without_orders
+FROM   customers c
+WHERE  NOT EXISTS (
+        SELECT 1
+        FROM   orders o
+        WHERE  o.customer_id = c.customer_id
+      )","**SQL query**
+
+```sql
+SELECT COUNT(*) AS customers_without_orders
+FROM   customers c
+WHERE  NOT EXISTS (
+        SELECT 1
+        FROM   orders o
+        WHERE  o.customer_id = c.customer_id
+      );
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| `FROM customers c` | Start with the list of all customers. |
+| `WHERE NOT EXISTS ( … )` | Keep only those customers for which the sub‑query finds **no** matching rows in `orders`. |
+| Sub‑query `SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id` | Looks for any order that belongs to the current customer. If at least one row is found, `EXISTS` is true and the outer row is filtered out. |
+| `COUNT(*)` | Counts the remaining rows – i.e., the number of customers that have never placed an order. |
+
+---
+
+### Alternative formulations
+
+All of the following produce the same result; pick the one you find most readable.
+
+#### 1. LEFT JOIN + IS NULL
+
+```sql
+SELECT COUNT(*) AS customers_without_orders
+FROM   customers c
+LEFT JOIN orders o
+       ON o.customer_id = c.customer_id
+WHERE  o.order_id IS NULL;          -- no matching order
+```
+
+#### 2. `NOT IN` (be careful with NULLs)
+
+```sql
+SELECT COUNT(*) AS customers_without_orders
+FROM   customers
+WHERE  customer_id NOT IN (SELECT customer_id FROM orders);
+```
+
+> **Tip:** `NOT EXISTS` is usually the safest choice because it correctly handles `NULL` values in `orders.customer_id` (if any) and tends to be well‑optimized by PostgreSQL’s planner.
+
+---
+
+### Quick test data (optional)
+
+If you want to verify the query on a small sample:
+
+```sql
+-- Sample data
+INSERT INTO customers (customer_id, name) VALUES
+  (1,'Alice'), (2,'Bob'), (3,'Carol'), (4,'Dave');
+
+INSERT INTO orders (order_id, customer_id, order_date) VALUES
+  (101,1,'2024-01-10'), (102,3,'2024-02-15');
+
+-- Run the query
+SELECT COUNT(*) AS customers_without_orders
+FROM   customers c
+WHERE  NOT EXISTS (
+        SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id
+      );
+-- Result: 2  (Bob and Dave have never ordered)
+```
+
+Feel free to adapt the column names (`customer_id`, `order_id`, etc.) if your schema uses different identifiers.",2.07,111,582
+M10,medium,"On average, how many line items does an order contain? Round to 2 decimal places.",openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"SELECT ROUND(AVG(item_cnt)::numeric, 2) AS avg_line_items_per_order
+FROM (
+        SELECT o.id,
+               COUNT(oi.id) AS item_cnt                
+        FROM   orders AS o
+        LEFT JOIN order_items AS oi
+               ON oi.order_id = o.id
+        GROUP BY o.id
+     ) AS per_order","**SQL (PostgreSQL)**  
+
+```sql
+SELECT ROUND(AVG(item_cnt)::numeric, 2) AS avg_line_items_per_order
+FROM (
+        SELECT o.id,
+               COUNT(oi.id) AS item_cnt                -- number of line‑items for this order
+        FROM   orders AS o
+        LEFT JOIN order_items AS oi
+               ON oi.order_id = o.id
+        GROUP BY o.id
+     ) AS per_order;
+```
+
+**Explanation**
+
+1. **Inner query (`per_order`)**  
+   * Joins `orders` to `order_items` (left join so orders with zero items are kept).  
+   * `COUNT(oi.id)` counts how many rows in `order_items` belong to each order → the line‑item count for that order.  
+
+2. **Outer query**  
+   * Takes the average of those counts across all orders: `AVG(item_cnt)`.  
+   * `ROUND(..., 2)` rounds the result to two decimal places (PostgreSQL’s `ROUND` works on `numeric`).  
+
+The result column `avg_line_items_per_order` gives the average number of line items per order, rounded to two decimal places.",2.0,121,441
+M11,medium,What is the total revenue from items in the Drink category?,openai/gpt-oss-120b,v1,False,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS total_drink_revenue
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.id
+WHERE  mi.category = 'Drink'","**SQL (PostgreSQL)**  
+
+```sql
+SELECT
+    SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS total_drink_revenue
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.id
+WHERE  mi.category = 'Drink';
+```
+
+### How it works
+| Step | What it does |
+|------|--------------|
+| `FROM order_items oi` | Starts from the line‑items that actually generated revenue. |
+| `JOIN menu_items mi ON oi.menu_item_id = mi.id` | Brings in the menu‑item details (including the category). |
+| `WHERE mi.category = 'Drink'` | Keeps only those rows whose menu item belongs to the **Drink** category. |
+| `COALESCE(oi.unit_price, mi.price)` | Uses the price recorded on the order (if you store the sale price in `order_items.unit_price`). If that column is `NULL`, it falls back to the current menu price. |
+| `SUM(oi.quantity * …)` | Multiplies the price by the quantity ordered and adds everything up, giving the total revenue from drinks. |
+
+### Things you might need to adjust
+* **Column names** – If your schema uses different names (e.g., `menu_item_id` → `item_id`, `category` → `type`, `price` → `list_price`), replace them accordingly.  
+* **Order status** – If you only want revenue from completed orders, add a join to the `orders` table and filter on a status column, e.g.:
+
+  ```sql
+  JOIN orders o ON oi.order_id = o.id
+  WHERE o.status = 'completed'   -- or whatever value denotes a finished order
+  ```
+
+* **Currency / rounding** – You can cast/round the result if needed:
+
+  ```sql
+  SELECT ROUND(SUM(...), 2) AS total_drink_revenue
+  ```
+
+That query will return a single number: the total revenue generated by all items that belong to the **Drink** category.",2.38,114,618
+M12,medium,Which day of the week has the most orders?,openai/gpt-oss-120b,v1,False,unknown_column,column o.order_date does not exist,"SELECT
+    TO_CHAR(o.order_date, 'Day')          AS weekday_name,   
+    EXTRACT(DOW FROM o.order_date)::int AS weekday_num,    
+    COUNT(*)                              AS total_orders
+FROM orders AS o
+GROUP BY weekday_name, weekday_num
+ORDER BY total_orders DESC
+LIMIT 1","**SQL (PostgreSQL)**  
+
+```sql
+/*  Which day of the week has the most orders?  */
+SELECT
+    TO_CHAR(o.order_date, 'Day')          AS weekday_name,   -- e.g. 'Monday   '
+    EXTRACT(DOW FROM o.order_date)::int AS weekday_num,    -- 0 = Sunday … 6 = Saturday
+    COUNT(*)                              AS total_orders
+FROM orders AS o
+GROUP BY weekday_name, weekday_num
+ORDER BY total_orders DESC
+LIMIT 1;
+```
+
+### How it works
+| Step | Explanation |
+|------|-------------|
+| `TO_CHAR(o.order_date, 'Day')` | Converts the timestamp/date to a readable weekday name (padded with spaces). |
+| `EXTRACT(DOW FROM o.order_date)` | Returns the numeric day of week (`0 = Sunday … 6 = Saturday`). Casting to `int` makes it easy to group. |
+| `GROUP BY` | Aggregates all rows that fall on the same weekday. |
+| `COUNT(*)` | Counts how many orders were placed on that weekday. |
+| `ORDER BY total_orders DESC` | Puts the weekday with the highest order count first. |
+| `LIMIT 1` | Returns only the top‑ranking day. |
+
+### Result example
+
+| weekday_name | weekday_num | total_orders |
+|--------------|------------|--------------|
+| Monday       | 1          | 342          |
+
+The query tells you that **Monday** (weekday number 1) had the most orders, with 342 orders in the data set. Adjust the column name (`order_date`) if your `orders` table uses a different timestamp column.",1.82,112,426
+M13,medium,"For the Abuja store, how many orders were placed and what was the total revenue?",openai/gpt-oss-120b,v1,False,unknown_column,column s.id does not exist,"SELECT
+    s.name                                   AS store_name,
+    COUNT(DISTINCT o.id)                     AS orders_placed,
+    COALESCE(SUM(mi.price * oi.quantity),0)  AS total_revenue
+FROM stores      AS s
+JOIN orders      AS o  ON o.store_id = s.id
+JOIN order_items AS oi ON oi.order_id = o.id
+JOIN menu_items  AS mi ON mi.id = oi.menu_item_id
+WHERE s.name = 'Abuja'                
+GROUP BY s.name","**SQL (PostgreSQL)**  
+
+```sql
+SELECT
+    s.name                                   AS store_name,
+    COUNT(DISTINCT o.id)                     AS orders_placed,
+    COALESCE(SUM(mi.price * oi.quantity),0)  AS total_revenue
+FROM stores      AS s
+JOIN orders      AS o  ON o.store_id = s.id
+JOIN order_items AS oi ON oi.order_id = o.id
+JOIN menu_items  AS mi ON mi.id = oi.menu_item_id
+WHERE s.name = 'Abuja'                -- the store we are interested in
+GROUP BY s.name;
+```
+
+### How it works
+| Step | What it does |
+|------|--------------|
+| `JOIN orders` | Links each order to the store it was placed at. |
+| `JOIN order_items` | Expands an order into its individual line‑items (quantity of each menu item). |
+| `JOIN menu_items` | Brings in the `price` of each menu item so we can calculate revenue. |
+| `WHERE s.name = 'Abuja'` | Restricts the result set to the Abuja store only. |
+| `COUNT(DISTINCT o.id)` | Counts each order **once**, even if it has many line‑items. |
+| `SUM(mi.price * oi.quantity)` | Multiplies the price of a menu item by the quantity ordered, then adds up all those values → total revenue. |
+| `COALESCE(...,0)` | Returns `0` instead of `NULL` when the store has no orders. |
+| `GROUP BY s.name` | Produces a single row per store (here just Abuja). |
+
+The query returns a single row with:
+
+* **store_name** – “Abuja”  
+* **orders_placed** – number of distinct orders placed at the Abuja store  
+* **total_revenue** – sum of `price × quantity` for all items sold at that store.  ",2.4,119,625
+M14,medium,"What is the average order total in each city, rounded to 2 decimal places?",openai/gpt-oss-120b,v1,False,unknown_column,column s.id does not exist,"SELECT
+    s.city,
+    ROUND(AVG(o.total)::numeric, 2) AS avg_order_total
+FROM orders AS o
+JOIN stores AS s
+      ON o.store_id = s.id
+GROUP BY s.city
+ORDER BY s.city","**Assumptions**
+
+* `stores(id, city, …)` – each store belongs to a city.  
+* `orders(id, store_id, …)` – an order is placed at a store.  
+* `order_items(id, order_id, menu_item_id, quantity)` – line‑items of an order.  
+* `menu_items(id, price, …)` – the price of a menu item (price is stored as a numeric/decimal).  
+
+If the **orders** table already stores the final order amount (e.g. a column called `total`), the query can be written directly against that column.  
+If the total must be **calculated** from the line‑items, we first compute each order’s total and then average those totals per city.
+
+---
+
+## 1️⃣ When the order total is already stored in `orders.total`
+
+```sql
+SELECT
+    s.city,
+    ROUND(AVG(o.total)::numeric, 2) AS avg_order_total
+FROM orders AS o
+JOIN stores AS s
+      ON o.store_id = s.id
+GROUP BY s.city
+ORDER BY s.city;
+```
+
+* `AVG(o.total)` gives the mean order value for each city.  
+* `ROUND(..., 2)` (or `::numeric(10,2)`) rounds the result to two decimal places.
+
+---
+
+## 2️⃣ When the order total must be derived from `order_items` + `menu_items`
+
+```sql
+/* Step 1 – compute the total for every single order */
+WITH order_totals AS (
+    SELECT
+        o.id          AS order_id,
+        s.city        AS city,
+        SUM(oi.quantity * mi.price) AS total
+    FROM orders       AS o
+    JOIN stores       AS s  ON o.store_id = s.id
+    JOIN order_items  AS oi ON oi.order_id = o.id
+    JOIN menu_items   AS mi ON oi.menu_item_id = mi.id
+    GROUP BY o.id, s.city
+)
+
+/* Step 2 – average those totals per city */
+SELECT
+    city,
+    ROUND(AVG(total)::numeric, 2) AS avg_order_total
+FROM order_totals
+GROUP BY city
+ORDER BY city;
+```
+
+* The CTE `order_totals` calculates the monetary value of each order (`quantity × price`).  
+* The outer query then averages those per‑city totals and rounds the result to two decimal places.
+
+---
+
+### Quick notes
+
+* `ROUND(..., 2)` works for most PostgreSQL numeric/decimal types. If you prefer an explicit cast, you can use `AVG(total)::numeric(10,2)`.  
+* If you need to exclude orders with a total of 0 (e.g., cancelled orders), add `WHERE total > 0` either inside the CTE or in the outer query.  
+* Adjust column names (`price`, `quantity`, `city`, etc.) if your schema uses different identifiers.",2.95,119,947
+M15,medium,"How many pizzas of each size (Small, Medium, Large) have been sold?",openai/gpt-oss-120b,v1,False,unknown_column,column oi.menu_item_id does not exist,"SELECT
+    mi.size AS pizza_size,                
+    SUM(oi.quantity) AS pizzas_sold
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.id
+WHERE  mi.category = 'Pizza'               
+  AND  mi.size IN ('Small','Medium','Large')
+GROUP  BY mi.size
+ORDER  BY
+    CASE mi.size
+        WHEN 'Small'  THEN 1
+        WHEN 'Medium' THEN 2
+        WHEN 'Large'  THEN 3
+    END","**SQL (PostgreSQL)**  
+
+```sql
+SELECT
+    mi.size AS pizza_size,                -- Small, Medium or Large
+    SUM(oi.quantity) AS pizzas_sold
+FROM   order_items   AS oi
+JOIN   menu_items    AS mi
+       ON oi.menu_item_id = mi.id
+WHERE  mi.category = 'Pizza'               -- keep only pizza items
+  AND  mi.size IN ('Small','Medium','Large')
+GROUP  BY mi.size
+ORDER  BY
+    CASE mi.size
+        WHEN 'Small'  THEN 1
+        WHEN 'Medium' THEN 2
+        WHEN 'Large'  THEN 3
+    END;
+```
+
+### How it works
+| Step | Explanation |
+|------|-------------|
+| **JOIN** `order_items` → `menu_items` | Connect each ordered line‑item to the menu definition so we can read the pizza’s size. |
+| **WHERE** `mi.category = 'Pizza'` | Guarantees we only count pizzas (if the `menu_items` table stores other products). |
+| **WHERE** `mi.size IN (…)` | Restricts the result to the three sizes you care about. |
+| **SUM(oi.quantity)** | Adds up the `quantity` column from `order_items`, which records how many of that menu item were sold in each order line. |
+| **GROUP BY mi.size** | Produces one row per pizza size. |
+| **ORDER BY** custom CASE | Returns the rows in logical size order (Small → Medium → Large). |
+
+> **Result** – a two‑column result set:  
+
+> *`pizza_size`* – the size label (`Small`, `Medium`, `Large`)  
+> *`pizzas_sold`* – total number of pizzas of that size sold across all stores, customers, and dates.  ",2.14,119,501
+M16,medium,Which customers have placed more than 10 orders? Show the customer ID and number of orders.,openai/gpt-oss-120b,v1,True,,,"SELECT
+    o.customer_id,
+    COUNT(*) AS num_orders
+FROM
+    orders AS o
+GROUP BY
+    o.customer_id
+HAVING
+    COUNT(*) > 10
+ORDER BY
+    num_orders DESC","**SQL**
+
+```sql
+SELECT
+    o.customer_id,
+    COUNT(*) AS num_orders
+FROM
+    orders AS o
+GROUP BY
+    o.customer_id
+HAVING
+    COUNT(*) > 10
+ORDER BY
+    num_orders DESC;
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| `FROM orders AS o` | Starts from the `orders` table, which (presumably) contains a `customer_id` column linking each order to the customer who placed it. |
+| `GROUP BY o.customer_id` | Groups all rows (orders) by the customer that placed them, so we can count orders per customer. |
+| `COUNT(*) AS num_orders` | Counts the total number of rows (orders) in each group, giving the number of orders per customer. |
+| `HAVING COUNT(*) > 10` | Filters the groups to keep only those customers whose order count exceeds 10. |
+| `ORDER BY num_orders DESC` | (Optional) Sorts the result so the most‑active customers appear first. |
+
+If you also want to display the customer’s name or other details, simply join the `customers` table:
+
+```sql
+SELECT
+    c.customer_id,
+    c.customer_name,          -- or any other columns you need
+    COUNT(*) AS num_orders
+FROM
+    orders AS o
+JOIN
+    customers AS c
+    ON o.customer_id = c.customer_id
+GROUP BY
+    c.customer_id, c.customer_name
+HAVING
+    COUNT(*) > 10
+ORDER BY
+    num_orders DESC;
+```
+
+Both queries return the **customer ID** (and optionally the name) together with the **number of orders** for every customer who has placed more than ten orders.",2.08,121,440
+H01,hard,"For each store, which menu item has sold the most units? Show the store ID and item name.",openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"WITH sales_per_item AS (
+    SELECT
+        o.store_id,                     
+        oi.menu_item_id,                
+        SUM(oi.quantity) AS units_sold  
+    FROM orders      AS o
+    JOIN order_items AS oi
+          ON oi.order_id = o.id
+    GROUP BY o.store_id, oi.menu_item_id
+),
+
+ 
+ranked_items AS (
+    SELECT
+        s.store_id,
+        s.menu_item_id,
+        s.units_sold,
+        ROW_NUMBER() OVER (PARTITION BY s.store_id
+                           ORDER BY s.units_sold DESC) AS rn   
+    FROM sales_per_item AS s
+)
+
+ 
+SELECT
+    r.store_id,
+    mi.name      AS item_name,
+    r.units_sold AS units_sold          
+FROM ranked_items AS r
+JOIN menu_items AS mi
+      ON mi.id = r.menu_item_id
+WHERE r.rn = 1                
+ORDER BY r.store_id","**SQL (PostgreSQL)**  
+
+```sql
+/* 1️⃣  Gather total units sold for every menu‑item in every store */
+WITH sales_per_item AS (
+    SELECT
+        o.store_id,                     -- the store that fulfilled the order
+        oi.menu_item_id,                -- the menu item that was ordered
+        SUM(oi.quantity) AS units_sold  -- total units of that item in that store
+    FROM orders      AS o
+    JOIN order_items AS oi
+          ON oi.order_id = o.id
+    GROUP BY o.store_id, oi.menu_item_id
+),
+
+/* 2️⃣  Rank the items inside each store by the amount sold */
+ranked_items AS (
+    SELECT
+        s.store_id,
+        s.menu_item_id,
+        s.units_sold,
+        ROW_NUMBER() OVER (PARTITION BY s.store_id
+                           ORDER BY s.units_sold DESC) AS rn   -- 1 = best‑seller
+    FROM sales_per_item AS s
+)
+
+/* 3️⃣  Keep only the top‑ranked item for each store and show its name */
+SELECT
+    r.store_id,
+    mi.name      AS item_name,
+    r.units_sold AS units_sold          -- optional, shows how many were sold
+FROM ranked_items AS r
+JOIN menu_items AS mi
+      ON mi.id = r.menu_item_id
+WHERE r.rn = 1                -- keep the “most‑sold” item per store
+ORDER BY r.store_id;
+```
+
+### How it works
+1. **`sales_per_item`** – Joins `orders` → `order_items` to get every line‑item, groups by the store that fulfilled the order and the menu‑item, and sums the `quantity` column to obtain the total units sold for that item in that store.  
+2. **`ranked_items`** – Uses the window function `ROW_NUMBER()` (partitioned by `store_id` and ordered by `units_sold` descending) to assign a rank to each menu‑item inside its store. The item with `rn = 1` is the top‑seller.  
+3. The final `SELECT` joins back to `menu_items` to retrieve the human‑readable `name` and returns the store ID together with the best‑selling item (and optionally the number of units sold).
+
+*If you want to keep ties (e.g., two items sold the exact same highest quantity), replace `ROW_NUMBER()` with `RANK()` or `DENSE_RANK()` and change the filter to `WHERE r.rn = 1` – this will return all tied top‑sellers.*",2.96,123,919
+H02,hard,"For each month of 2026, show the revenue and the change in revenue from the previous month, in month order.",openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"WITH monthly_rev AS (
+    SELECT
+        date_trunc('month', o.order_date)               AS month_start,   
+        SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS revenue
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.id
+     
+    LEFT JOIN menu_items AS mi ON mi.id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'               
+    GROUP BY 1
+)
+
+SELECT
+    to_char(month_start, 'YYYY-MM')                     AS month,
+    revenue,
+    revenue -
+        LAG(revenue) OVER (ORDER BY month_start)        AS revenue_change
+FROM monthly_rev
+ORDER BY month_start","**Query**
+
+```sql
+/*  Revenue by month for 2026 and month‑over‑month change  */
+WITH monthly_rev AS (
+    SELECT
+        date_trunc('month', o.order_date)               AS month_start,   -- 2026‑01‑01, 2026‑02‑01, …
+        SUM(oi.quantity * COALESCE(oi.unit_price, mi.price)) AS revenue
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.id
+    /*  If the line‑item does not store the price, pull it from the menu item  */
+    LEFT JOIN menu_items AS mi ON mi.id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'               -- restrict to 2026
+    GROUP BY 1
+)
+
+SELECT
+    to_char(month_start, 'YYYY-MM')                     AS month,
+    revenue,
+    revenue -
+        LAG(revenue) OVER (ORDER BY month_start)        AS revenue_change
+FROM monthly_rev
+ORDER BY month_start;
+```
+
+**Explanation**
+
+| Step | What it does |
+|------|--------------|
+| `date_trunc('month', o.order_date)` | Normalises every order date to the first day of its month, giving a single row per month. |
+| `SUM(oi.quantity * COALESCE(oi.unit_price, mi.price))` | Calculates the total sales amount for the month. If the line‑item stores its own `unit_price` we use it; otherwise we fall back to the current price from `menu_items`. |
+| `WHERE o.order_date …` | Limits the data to the calendar year 2026. |
+| `LAG(revenue) OVER (ORDER BY month_start)` | Retrieves the revenue of the previous month so we can compute the month‑over‑month difference. |
+| `to_char(month_start, 'YYYY-MM')` | Formats the month for a readable output (e.g., “2026‑03”). |
+| `ORDER BY month_start` | Guarantees the rows appear in chronological order. |
+
+The result set will look like:
+
+| month   | revenue | revenue_change |
+|---------|---------|----------------|
+| 2026‑01 | 12345.67| (null)         |
+| 2026‑02 | 14000.12| 1654.45        |
+| 2026‑03 | 13250.00| -750.12        |
+| …       | …       | …              |
+
+The first month’s change is `NULL` because there is no preceding month to compare against. If you prefer `0` instead, wrap the expression with `COALESCE(...,0)`.",3.05,127,922
+H03,hard,What percentage of total item revenue comes from each menu category? Round to 2 decimal places.,openai/gpt-oss-120b,v1,False,unknown_column,column mi.id does not exist,"SELECT
+    mi.category,
+    ROUND(100.0 * SUM(oi.quantity * mi.price) 
+               / SUM(SUM(oi.quantity * mi.price)) OVER (), 2) AS revenue_pct
+FROM   order_items  oi
+JOIN   menu_items   mi ON mi.id = oi.menu_item_id
+GROUP  BY mi.category
+ORDER  BY revenue_pct DESC","**SQL (PostgreSQL)**  
+
+```sql
+/*  Percentage of total item revenue contributed by each menu category  */
+SELECT
+    mi.category,
+    ROUND(100.0 * SUM(oi.quantity * mi.price) 
+               / SUM(SUM(oi.quantity * mi.price)) OVER (), 2) AS revenue_pct
+FROM   order_items  oi
+JOIN   menu_items   mi ON mi.id = oi.menu_item_id
+GROUP  BY mi.category
+ORDER  BY revenue_pct DESC;
+```
+
+### How it works  
+
+| Step | What the query does |
+|------|----------------------|
+| `JOIN menu_items` | Brings the **price** and **category** of each menu item into the `order_items` rows. |
+| `SUM(oi.quantity * mi.price)` | Calculates the **revenue** contributed by each order line (quantity × unit price). |
+| `GROUP BY mi.category` | Aggregates the revenue per **menu category**. |
+| `SUM(SUM(...)) OVER ()` | A window‑function that returns the **grand total revenue** across *all* categories (the inner `SUM` is the per‑category revenue, the outer `SUM … OVER ()` adds them together). |
+| `100.0 * … / …` | Converts the category’s revenue into a **percentage** of the grand total. |
+| `ROUND(..., 2)` | Rounds the result to **two decimal places** as required. |
+| `ORDER BY revenue_pct DESC` | Shows the categories from highest to lowest contribution. |
+
+### Assumptions about the schema  
+
+| Table | Relevant columns used in the query |
+|-------|-------------------------------------|
+| `menu_items` | `id` (PK), `category`, `price` |
+| `order_items`| `order_id`, `menu_item_id`, `quantity` |
+| (Other tables – `stores`, `customers`, `ingredients`, `orders` – are not needed for this calculation.) |
+
+If the unit price at the time of sale is stored in `order_items` (e.g., a column called `unit_price`), replace `mi.price` with that column:
+
+```sql
+SUM(oi.quantity * oi.unit_price)
+```
+
+The query returns one row per menu category, e.g.:
+
+| category   | revenue_pct |
+|------------|-------------|
+| Beverages  | 27.34       |
+| Desserts   | 19.81       |
+| Entrees    | 52.85       |
+
+Each value is the **percentage of total item revenue** contributed by that category, rounded to two decimal places.",2.63,121,822
+H04,hard,How many customers placed their very first order in January 2026?,openai/gpt-oss-120b,v1,False,unknown_column,column o.order_date does not exist,"SELECT COUNT(*) AS customers_first_order_jan_2026
+FROM (
+         
+        SELECT  o.customer_id,
+                MIN(o.order_date) AS first_order_date
+        FROM    orders AS o
+        GROUP BY o.customer_id
+     ) AS first_orders
+WHERE first_orders.first_order_date >= DATE '2026-01-01'
+  AND first_orders.first_order_date <  DATE '2026-02-01'","**SQL (PostgreSQL)**  
+
+```sql
+/*  How many distinct customers placed their very first order
+    in the month of January 2026?                                   */
+SELECT COUNT(*) AS customers_first_order_jan_2026
+FROM (
+        /*  Find the earliest order date for each customer  */
+        SELECT  o.customer_id,
+                MIN(o.order_date) AS first_order_date
+        FROM    orders AS o
+        GROUP BY o.customer_id
+     ) AS first_orders
+WHERE first_orders.first_order_date >= DATE '2026-01-01'
+  AND first_orders.first_order_date <  DATE '2026-02-01';
+```
+
+### Explanation  
+
+1. **Inner query (`first_orders`)**  
+   * `MIN(o.order_date)` returns the earliest (i.e., *first*) order date for each `customer_id`.  
+   * `GROUP BY o.customer_id` ensures we get one row per customer.
+
+2. **Outer query**  
+   * Filters those first‑order dates to the range that covers the whole month of January 2026 (`>= 2026‑01‑01` and `< 2026‑02‑01`).  
+   * `COUNT(*)` then counts how many customers satisfy that condition.
+
+> **Assumptions**  
+> * The `orders` table contains at least the columns `order_id`, `customer_id`, and `order_date` (a `date` or `timestamp`).  
+> * A customer is considered to have “placed their first order” if they have at least one row in `orders`.  
+> * If `order_date` is a timestamp with a time‑zone, the comparison still works because PostgreSQL will cast the literal dates to timestamps at midnight UTC (or the session’s time zone).  
+
+You can adapt the date literals to use `TIMESTAMP` or `TIMESTAMPTZ` if you need a specific time‑zone granularity.",2.46,116,597
+H05,hard,"Show the running total of revenue by month for 2026, in month order.",openai/gpt-oss-120b,v1,False,unknown_column,column mi.menu_item_id does not exist,"WITH monthly_rev AS (
+     
+    SELECT
+        date_trunc('month', o.order_date)::date   AS month_start,   
+        SUM(oi.quantity * mi.price)               AS month_rev      
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.order_id
+    JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'          
+    GROUP BY 1
+),
+
+ 
+all_months AS (
+    SELECT generate_series(
+               DATE '2026-01-01',
+               DATE '2026-12-01',
+               INTERVAL '1 month')::date AS month_start
+)
+
+SELECT
+    am.month_start,
+    COALESCE(mr.month_rev, 0)                                   AS month_revenue,
+    SUM(COALESCE(mr.month_rev, 0))
+        OVER (ORDER BY am.month_start
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total
+FROM all_months AS am
+LEFT JOIN monthly_rev AS mr
+       ON mr.month_start = am.month_start
+ORDER BY am.month_start","**SQL (PostgreSQL)**  
+
+```sql
+/*  Running total of revenue by month for the year 2026  */
+WITH monthly_rev AS (
+    /* 1️⃣  Revenue per month (all orders that were placed in 2026) */
+    SELECT
+        date_trunc('month', o.order_date)::date   AS month_start,   -- 2026‑01‑01, 2026‑02‑01, …
+        SUM(oi.quantity * mi.price)               AS month_rev      -- revenue for that month
+    FROM orders        AS o
+    JOIN order_items   AS oi ON oi.order_id = o.order_id
+    JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+    WHERE o.order_date >= DATE '2026-01-01'
+      AND o.order_date <  DATE '2027-01-01'          -- restrict to 2026
+    GROUP BY 1
+),
+
+/* 2️⃣  Make sure every month of 2026 appears (even if revenue = 0) */
+all_months AS (
+    SELECT generate_series(
+               DATE '2026-01-01',
+               DATE '2026-12-01',
+               INTERVAL '1 month')::date AS month_start
+)
+
+SELECT
+    am.month_start,
+    COALESCE(mr.month_rev, 0)                                   AS month_revenue,
+    SUM(COALESCE(mr.month_rev, 0))
+        OVER (ORDER BY am.month_start
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total
+FROM all_months AS am
+LEFT JOIN monthly_rev AS mr
+       ON mr.month_start = am.month_start
+ORDER BY am.month_start;
+```
+
+### What the query does  
+
+| Step | Explanation |
+|------|-------------|
+| **`monthly_rev` CTE** | Calculates the revenue for each month that actually has orders. Revenue is derived from `order_items.quantity * menu_items.price` (you can replace `mi.price` with the appropriate column if the price lives elsewhere). |
+| **`all_months` CTE** | Generates a row for every month of 2026 (`2026‑01‑01 … 2026‑12‑01`). This guarantees that months with no sales still appear in the final result with a revenue of 0. |
+| **Final SELECT** | Joins the two CTEs, substitutes `NULL` with `0` for months without sales, and computes a running total using the window function `SUM … OVER (ORDER BY month_start)`. The result is ordered chronologically. |
+
+**Result columns**
+
+| `month_start` | `month_revenue` | `running_total` |
+|---------------|----------------|-----------------|
+| 2026‑01‑01    | revenue for Jan 2026 | cumulative revenue up to Jan |
+| 2026‑02‑01    | revenue for Feb 2026 | cumulative revenue up to Feb |
+| …             | …                | …               |
+| 2026‑12‑01    | revenue for Dec 2026 | cumulative revenue for the whole year |
+
+Feel free to adjust column names (`order_date`, `price`, etc.) to match the exact schema of your tables. The query works on PostgreSQL 9.4+ (window functions and `generate_series`).",2.71,119,822
+H06,hard,How many orders have a total amount that does not equal the sum of quantity times unit price of their items?,openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"SELECT COUNT(*) AS orders_with_mismatched_total
+FROM (
+        SELECT  o.id,
+                o.total_amount,                                 
+                SUM( oi.quantity *
+                     COALESCE(oi.unit_price, mi.unit_price) )   
+                AS items_total
+        FROM    orders      AS o
+        JOIN    order_items AS oi
+               ON oi.order_id = o.id
+         
+        LEFT JOIN menu_items  AS mi
+               ON mi.id = oi.menu_item_id
+        GROUP BY o.id, o.total_amount
+        HAVING
+             
+            ABS(o.total_amount - SUM( oi.quantity *
+                                      COALESCE(oi.unit_price, mi.unit_price) )) > 0.01
+     ) AS mismatched","**SQL (PostgreSQL)**  
+
+```sql
+/*  Count the orders whose stored total does NOT match the
+    sum of (quantity × unit_price) of the items that belong to the order.
+    If the price is kept on the order_items row, use that column directly.
+    If the price lives on the menu_items table, join to it (the query
+    works for either case – just comment‑out the join you don’t need).          */
+
+SELECT COUNT(*) AS orders_with_mismatched_total
+FROM (
+        SELECT  o.id,
+                o.total_amount,                                 -- amount stored on the order
+                SUM( oi.quantity *
+                     COALESCE(oi.unit_price, mi.unit_price) )   -- price from the item row or from menu_items
+                AS items_total
+        FROM    orders      AS o
+        JOIN    order_items AS oi
+               ON oi.order_id = o.id
+        /* --------------------------------------------------------------
+           If the unit price is stored on the menu_items table, uncomment
+           the join below and the COALESCE expression will pick it up.
+           -------------------------------------------------------------- */
+        LEFT JOIN menu_items  AS mi
+               ON mi.id = oi.menu_item_id
+        GROUP BY o.id, o.total_amount
+        HAVING
+            /*  Use a tolerance if you want to ignore tiny rounding differences   */
+            ABS(o.total_amount - SUM( oi.quantity *
+                                      COALESCE(oi.unit_price, mi.unit_price) )) > 0.01
+     ) AS mismatched;
+```
+
+### How it works
+| Step | What happens |
+|------|--------------|
+| **1. Join** | `orders` → `order_items` (every line of an order). Optionally join `menu_items` to fetch the current price if `order_items` does not store its own `unit_price`. |
+| **2. Compute line totals** | For each line we calculate `quantity * unit_price`. `COALESCE` picks the price from `order_items` when it exists, otherwise falls back to the price from `menu_items`. |
+| **3. Aggregate per order** | `SUM(...)` gives the total of all line‑items for that order (`items_total`). |
+| **4. Compare with stored total** | The `HAVING` clause keeps only those orders where the stored `total_amount` differs from the computed `items_total`. A small tolerance (`0.01`) is used to avoid false positives caused by rounding. |
+| **5. Count** | The outer query simply counts the rows returned by the sub‑query, i.e. the number of orders with a mismatched total. |
+
+### Adjustments you might need
+* **Column names** – replace `total_amount`, `unit_price`, `menu_item_id` etc. with the exact names used in your schema.
+* **Tolerance** – change `0.01` to `0` if you want an exact equality check, or to a larger value if your business tolerates bigger rounding differences.
+* **Currency/precision** – if you store amounts as `numeric(12,2)` you can safely use `=` instead of the absolute‑difference test.  
+
+Running the query will give you a single integer (`orders_with_mismatched_total`) that answers the question: *How many orders have a total amount that does not equal the sum of quantity × unit price of their items?*",2.91,124,935
+H07,hard,Which customers placed 7 or more orders at Lagos stores? Show customer ID and order count.,openai/gpt-oss-120b,v1,True,,,"SELECT
+    c.customer_id,
+    COUNT(*) AS order_count
+FROM
+    customers   AS c
+    JOIN orders      AS o ON o.customer_id = c.customer_id
+    JOIN stores      AS s ON s.store_id   = o.store_id
+WHERE
+    s.city = 'Lagos'                 
+GROUP BY
+    c.customer_id
+HAVING
+    COUNT(*) >= 7","**SQL**
+
+```sql
+SELECT
+    c.customer_id,
+    COUNT(*) AS order_count
+FROM
+    customers   AS c
+    JOIN orders      AS o ON o.customer_id = c.customer_id
+    JOIN stores      AS s ON s.store_id   = o.store_id
+WHERE
+    s.city = 'Lagos'                 -- only Lagos stores
+GROUP BY
+    c.customer_id
+HAVING
+    COUNT(*) >= 7;                    -- 7 or more orders
+```
+
+**Explanation**
+
+1. **Join the tables** – link `customers → orders → stores` so we can see which store each order was placed at.  
+2. **Filter** – keep only rows where the store’s `city` (or equivalent column) is `'Lagos'`.  
+3. **Group** by `customer_id` to aggregate orders per customer.  
+4. **Count** the orders per customer with `COUNT(*)`.  
+5. **HAVING** clause discards customers with fewer than 7 orders.  
+
+The result returns each qualifying `customer_id` together with the number of orders they placed at Lagos‑based stores.",2.15,121,462
+H08,hard,"For each menu category, which item has brought in the most revenue? Show category, item name and revenue.",openai/gpt-oss-120b,v1,False,unknown_column,column oi.menu_item_id does not exist,"WITH item_revenue AS (
+    SELECT
+        mi.category,
+        mi.name               AS item_name,
+        SUM(oi.quantity * oi.unit_price) AS revenue
+    FROM menu_items   mi
+    JOIN order_items  oi
+          ON oi.menu_item_id = mi.id
+    GROUP BY
+        mi.category,
+        mi.name
+),
+
+ 
+ranked_items AS (
+    SELECT
+        category,
+        item_name,
+        revenue,
+        ROW_NUMBER() OVER (PARTITION BY category
+                           ORDER BY revenue DESC) AS rn
+    FROM item_revenue
+)
+
+
+SELECT
+    category,
+    item_name,
+    revenue
+FROM ranked_items
+WHERE rn = 1
+ORDER BY category","**Assumptions about the schema**
+
+| Table          | Relevant columns (used in the query)                              |
+|----------------|-------------------------------------------------------------------|
+| `menu_items`   | `id`, `name`, `category`, `price` (the static menu price)        |
+| `order_items` | `order_id`, `menu_item_id`, `quantity`, `unit_price` (price at the moment of the order) |
+| `orders`       | `id` (only needed to join to `order_items`)                      |
+
+The revenue contributed by a menu item is the sum of **quantity × unit_price** for all its order‑line rows.
+
+---
+
+## Query
+
+```sql
+/* 1️⃣  Compute total revenue per menu item */
+WITH item_revenue AS (
+    SELECT
+        mi.category,
+        mi.name               AS item_name,
+        SUM(oi.quantity * oi.unit_price) AS revenue
+    FROM menu_items   mi
+    JOIN order_items  oi
+          ON oi.menu_item_id = mi.id
+    GROUP BY
+        mi.category,
+        mi.name
+),
+
+/* 2️⃣  Rank items inside each category by revenue (highest first) */
+ranked_items AS (
+    SELECT
+        category,
+        item_name,
+        revenue,
+        ROW_NUMBER() OVER (PARTITION BY category
+                           ORDER BY revenue DESC) AS rn
+    FROM item_revenue
+)
+
+-- 3️⃣  Keep only the top‑earning item per category
+SELECT
+    category,
+    item_name,
+    revenue
+FROM ranked_items
+WHERE rn = 1
+ORDER BY category;
+```
+
+### What the query does
+
+1. **`item_revenue` CTE** – Joins `menu_items` to `order_items` and aggregates the total revenue for each *category‑item* pair.
+2. **`ranked_items` CTE** – Uses the window function `ROW_NUMBER()` to assign a rank to each item **within its own category**, ordering by revenue descending.
+3. The outer `SELECT` keeps only the rows where `rn = 1`, i.e. the item that generated the most revenue in its category.
+
+> **If you want to keep ties** (multiple items that share the same highest revenue), replace `ROW_NUMBER()` with `RANK()` or `DENSE_RANK()` and filter on `rank = 1`.
+
+---
+
+### Result columns
+
+| column   | description                                    |
+|----------|------------------------------------------------|
+| `category` | The menu category (e.g., *Beverages*, *Desserts*) |
+| `item_name`| Name of the menu item that earned the most revenue in that category |
+| `revenue`  | Total revenue contributed by that item (sum of `quantity × unit_price`) |
+
+This query works on any PostgreSQL version that supports window functions (PostgreSQL 8.4+). Adjust column names if your actual schema differs.",3.01,124,901
+H09,hard,What percentage of orders include at least one drink? Round to 2 decimal places.,openai/gpt-oss-120b,v1,False,unknown_column,column mi.menu_item_id does not exist,"SELECT
+    ROUND(
+        100.0 *
+        COUNT(DISTINCT o.order_id)                                   
+        / NULLIF( (SELECT COUNT(*) FROM orders), 0 ),                 
+        2
+    ) AS drink_order_percentage
+FROM orders        AS o
+JOIN order_items   AS oi ON oi.order_id = o.order_id
+JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE mi.category = 'Drink'","**Assumptions**
+
+* `menu_items` has a column that tells you whether the item is a drink.  
+  * It could be a text column `category` that stores the value **'Drink'**.  
+  * Or a boolean column `is_drink` (TRUE for drinks).  
+* `order_items` links an order (`order_id`) to a menu item (`menu_item_id`).  
+
+If your schema uses a different column name, just replace the column in the `WHERE` clause accordingly.
+
+---
+
+### Query (using a `category` column)
+
+```sql
+/*  Percentage of orders that contain at least one drink  */
+SELECT
+    ROUND(
+        100.0 *
+        COUNT(DISTINCT o.order_id)                                   -- orders that have a drink
+        / NULLIF( (SELECT COUNT(*) FROM orders), 0 ),                 -- total orders
+        2
+    ) AS drink_order_percentage
+FROM orders        AS o
+JOIN order_items   AS oi ON oi.order_id = o.order_id
+JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE mi.category = 'Drink';
+```
+
+---
+
+### Query (using a boolean `is_drink` column)
+
+```sql
+SELECT
+    ROUND(
+        100.0 *
+        COUNT(DISTINCT o.order_id) /
+        NULLIF( (SELECT COUNT(*) FROM orders), 0 ),
+        2
+    ) AS drink_order_percentage
+FROM orders        AS o
+JOIN order_items   AS oi ON oi.order_id = o.order_id
+JOIN menu_items    AS mi ON mi.menu_item_id = oi.menu_item_id
+WHERE mi.is_drink = TRUE;
+```
+
+---
+
+### How it works
+
+1. **`COUNT(DISTINCT o.order_id)`** – counts each order only once, even if it contains several drinks.
+2. **`(SELECT COUNT(*) FROM orders)`** – total number of orders placed.
+3. **`NULLIF(...,0)`** – protects against division‑by‑zero if the `orders` table were empty.
+4. **`ROUND(...,2)`** – rounds the resulting percentage to two decimal places.
+
+The result column `drink_order_percentage` will contain a value like `23.45`, meaning **23.45 %** of all orders contain at least one drink.",2.4,119,736
+H10,hard,Which hour of the day has the highest average order total?,openai/gpt-oss-120b,v1,False,unknown_column,column o.id does not exist,"WITH order_totals AS (
+    SELECT
+        o.id                                   AS order_id,
+        EXTRACT(HOUR FROM o.order_time)        AS order_hour,   
+        SUM(oi.quantity * mi.price)            AS order_total
+    FROM orders      AS o
+    JOIN order_items AS oi ON oi.order_id = o.id
+    JOIN menu_items  AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.id, order_hour
+)
+
+ 
+SELECT
+    order_hour,
+    AVG(order_total) AS avg_order_total
+FROM order_totals
+GROUP BY order_hour
+ORDER BY avg_order_total DESC
+LIMIT 1","**SQL (PostgreSQL)**  
+
+```sql
+/* 1️⃣  Compute the total amount for each individual order                */
+WITH order_totals AS (
+    SELECT
+        o.id                                   AS order_id,
+        EXTRACT(HOUR FROM o.order_time)        AS order_hour,   -- hour of the day (0‑23)
+        SUM(oi.quantity * mi.price)            AS order_total
+    FROM orders      AS o
+    JOIN order_items AS oi ON oi.order_id = o.id
+    JOIN menu_items  AS mi ON mi.id = oi.menu_item_id
+    GROUP BY o.id, order_hour
+)
+
+/* 2️⃣  Average those totals per hour and pick the highest one            */
+SELECT
+    order_hour,
+    AVG(order_total) AS avg_order_total
+FROM order_totals
+GROUP BY order_hour
+ORDER BY avg_order_total DESC
+LIMIT 1;
+```
+
+### How it works
+| Step | What it does |
+|------|--------------|
+| **CTE `order_totals`** | Joins `orders → order_items → menu_items` to calculate the monetary total of each order (`quantity * price`). It also extracts the hour (0‑23) from the order’s timestamp (`order_time`). |
+| **Main query** | Groups the per‑order totals by the extracted hour, computes the average (`AVG(order_total)`) for each hour, orders the result descending by that average, and returns only the top row (`LIMIT 1`). |
+
+### Assumptions
+* `orders.order_time` is a `timestamp` (or `timestamptz`) column that records when the order was placed.  
+* `menu_items.price` stores the unit price of a menu item.  
+* No discounts, taxes, or other adjustments are considered—just `quantity × price`.  
+
+If you need to factor in taxes, discounts, or a different price column, simply adjust the expression inside the `SUM()` accordingly.",2.26,114,652
+U01,unanswerable,Which ingredient is used in the most pizzas?,openai/gpt-oss-120b,v1,False,hallucinated_answer,answered a question the data cannot support,"SELECT
+    i.ingredient_id,
+    i.name,
+    COUNT(DISTINCT mi.menu_item_id) AS pizza_cnt
+FROM
+    ingredients                AS i
+JOIN
+    menu_item_ingredients      AS mi_ing
+        ON i.ingredient_id = mi_ing.ingredient_id
+JOIN
+    menu_items                 AS mi
+        ON mi_ing.menu_item_id = mi.menu_item_id
+WHERE
+    mi.category = 'Pizza'          
+GROUP BY
+    i.ingredient_id,
+    i.name
+ORDER BY
+    pizza_cnt DESC
+LIMIT 1","Below is a **generic** query that works for the usual way of modelling a “pizza‑ingredients” relationship in a restaurant database:
+
+* `menu_items` – one row per menu item (pizza, salad, drink, …).  
+* `ingredients` – one row per ingredient (cheese, pepperoni, …).  
+* `menu_item_ingredients` – a many‑to‑many bridge table that tells which ingredient belongs to which menu item.  
+* The column that identifies a pizza in `menu_items` is called `category` (or `type`) and contains the value **‘Pizza’** (adjust the column name/value to match your schema).
+
+```sql
+/*  Which ingredient appears in the greatest number of distinct pizzas?  */
+SELECT
+    i.ingredient_id,
+    i.name,
+    COUNT(DISTINCT mi.menu_item_id) AS pizza_cnt
+FROM
+    ingredients                AS i
+JOIN
+    menu_item_ingredients      AS mi_ing
+        ON i.ingredient_id = mi_ing.ingredient_id
+JOIN
+    menu_items                 AS mi
+        ON mi_ing.menu_item_id = mi.menu_item_id
+WHERE
+    mi.category = 'Pizza'          -- or mi.type = 'pizza'
+GROUP BY
+    i.ingredient_id,
+    i.name
+ORDER BY
+    pizza_cnt DESC
+LIMIT 1;
+```
+
+### What the query does
+
+| Step | Explanation |
+|------|-------------|
+| **JOIN** `ingredients → menu_item_ingredients → menu_items` | Walks the many‑to‑many relationship so we can see every ingredient‑pizza pair. |
+| **WHERE mi.category = 'Pizza'** | Restricts the count to *pizzas* only (ignore salads, drinks, etc.). |
+| **COUNT(DISTINCT mi.menu_item_id)** | Counts how many **different pizza menu items** use each ingredient. |
+| **GROUP BY i.ingredient_id, i.name** | Gives one row per ingredient. |
+| **ORDER BY pizza_cnt DESC** | Puts the ingredient used in the most pizzas at the top. |
+| **LIMIT 1** | Returns just the top‑scoring ingredient. |
+
+---
+
+## If your schema is slightly different
+
+| Situation | Adjusted query |
+|-----------|----------------|
+| **No explicit bridge table** – the ingredient is stored directly on `menu_items` (e.g., `menu_items.ingredient_id`). | ```sql SELECT i.ingredient_id, i.name, COUNT(*) AS pizza_cnt FROM ingredients i JOIN menu_items mi ON i.ingredient_id = mi.ingredient_id WHERE mi.category='Pizza' GROUP BY i.ingredient_id, i.name ORDER BY pizza_cnt DESC LIMIT 1; ``` |
+| **Bridge table has a different name** (e.g., `pizza_ingredients`). | Replace `menu_item_ingredients` with the actual table name. |
+| **Pizza identification uses a boolean flag** (`mi.is_pizza = true`). | Change the `WHERE` clause to `WHERE mi.is_pizza`. |
+| **You also want the count of pizzas for *all* ingredients** (not just the top one). | Remove the `LIMIT 1` clause. |
+
+---
+
+### Quick sanity‑check
+
+Run the query without `LIMIT 1` first:
+
+```sql
+SELECT i.name,
+       COUNT(DISTINCT mi.menu_item_id) AS pizza_cnt
+FROM   ingredients i
+JOIN   menu_item_ingredients mi_ing ON i.ingredient_id = mi_ing.ingredient_id
+JOIN   menu_items mi               ON mi_ing.menu_item_id = mi.menu_item_id
+WHERE  mi.category = 'Pizza'
+GROUP BY i.name
+ORDER BY pizza_cnt DESC;
+```
+
+You’ll see a ranked list of ingredients; the first row is the answer to the original question.",4.11,111,1182
+U02,unanswerable,What is the average delivery time for each store?,openai/gpt-oss-120b,v1,False,hallucinated_answer,answered a question the data cannot support,delivered_at - order_placed_at,"**Assumptions about the schema**
+
+| Table | Relevant columns (for this query) |
+|-------|-----------------------------------|
+| `stores`      | `store_id` (PK), `store_name` (or any other descriptive column) |
+| `orders`      | `order_id` (PK), `store_id` (FK → stores), `order_placed_at` (timestamp), `delivered_at` (timestamp) |
+
+The delivery time for an order is the elapsed time between the moment the order was placed and the moment it was delivered:
+
+```sql
+delivered_at - order_placed_at   -- returns an INTERVAL
+```
+
+**SQL – average delivery time per store**
+
+```sql
+SELECT
+    s.store_id,
+    s.store_name,
+    -- average interval (delivery time) expressed as a human‑readable interval
+    AVG(o.delivered_at - o.order_placed_at)          AS avg_delivery_interval,
+    -- the same value expressed in minutes (optional, often easier to read)
+    ROUND(AVG(EXTRACT(EPOCH FROM (o.delivered_at - o.order_placed_at))) / 60, 2)
+        AS avg_delivery_minutes
+FROM
+    stores  AS s
+JOIN
+    orders  AS o
+    ON o.store_id = s.store_id
+WHERE
+    o.delivered_at IS NOT NULL          -- ignore orders that haven’t been delivered yet
+GROUP BY
+    s.store_id,
+    s.store_name
+ORDER BY
+    s.store_id;
+```
+
+### What the query does
+
+1. **Join** `stores` to `orders` so we can attribute each order to the store that fulfilled it.  
+2. **Filter** out rows where `delivered_at` is `NULL` (i.e., the order is still in progress) – they would otherwise skew the average.  
+3. **Compute the delivery interval** for each order (`delivered_at - order_placed_at`).  
+4. **Aggregate** with `AVG()` per store.  
+   * `AVG(o.delivered_at - o.order_placed_at)` returns an `INTERVAL` that PostgreSQL can display directly (e.g., `00:12:34`).  
+   * The second column converts that interval to total minutes (`EXTRACT(EPOCH …) / 60`) and rounds it to two decimal places for easier numeric reporting.  
+5. **Group** by the store’s primary key (and any descriptive column you want to show).  
+6. **Order** the result set by `store_id` for a predictable output order.
+
+You can drop the `avg_delivery_minutes` column if you only need the interval, or add additional columns (e.g., city, region) to the `GROUP BY`/`SELECT` list as required by your reporting needs.",2.79,112,749

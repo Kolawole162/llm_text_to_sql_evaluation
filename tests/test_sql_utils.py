@@ -29,3 +29,10 @@ def test_read_only_rejects_writes_and_multiple_statements():
     assert not is_read_only("DELETE FROM orders")
     assert not is_read_only("SELECT 1; DROP TABLE orders")
     assert not is_read_only("WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d")
+
+
+def test_comments_are_removed():
+    reply = "```sql\n-- Count customers; simple\nSELECT COUNT(*) /* all rows */ FROM customers;\n```"
+    sql = extract_sql(reply)
+    assert sql == "SELECT COUNT(*)   FROM customers"
+    assert is_read_only(sql)
